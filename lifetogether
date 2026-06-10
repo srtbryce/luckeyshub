@@ -405,7 +405,7 @@ local function toggleJobSpammer()
                 for _, job in ipairs(jobs) do
                     if not JobSpammerActive then break end
                     Send("job", job)
-                    task.wait(1.5)
+                    task.wait(0.1)
                 end
             end
         end)
@@ -415,6 +415,7 @@ local function toggleJobSpammer()
         notify("Job Spammer OFF")
     end
 end
+
 
 local AntiOutfitActive = false
 local outfitListener = nil
@@ -435,6 +436,106 @@ local function toggleAntiOutfit()
         if outfitListener then outfitListener:Disconnect(); outfitListener = nil end
         if originalBio then Send("bio", originalBio) else Send("bio", "") end
         notify("Anti Outfit Stealer OFF")
+    end
+end
+
+-- ================================
+--  CAR COOKER (Optimized – no lag)
+-- ================================
+local CarCookerActive = false
+local carCookerThread = nil
+
+local function stopCarCooker()
+    if carCookerThread then
+        task.cancel(carCookerThread)
+        carCookerThread = nil
+    end
+    local vehicle = getOwnedVehicle()
+    if vehicle then
+        local root = vehicle:FindFirstChild("HumanoidRootPart") 
+                    or vehicle:FindFirstChild("Base") 
+                    or vehicle:FindFirstChildWhichIsA("BasePart")
+        if root then
+            root.Velocity = Vector3.zero
+            root.RotVelocity = Vector3.zero
+        end
+    end
+end
+-- ================================
+--  CAR COOKER (vehicle fling using walkfling logic)
+-- ================================
+local CarCookerActive = false
+local carCookerThread = nil
+
+local function startCarCooker()
+    if carCookerThread then return end
+    carCookerThread = task.spawn(function()
+        -- Same loop structure as walkfling
+        repeat
+            RunService.Heartbeat:Wait()
+            
+            -- Get owned vehicle and its root part
+            local vehicle = getOwnedVehicle()
+            local root = vehicle and (vehicle:FindFirstChild("HumanoidRootPart") 
+                                    or vehicle:FindFirstChild("Base") 
+                                    or vehicle:FindFirstChildWhichIsA("BasePart"))
+            
+            -- Wait until vehicle and root are valid
+            while not (vehicle and vehicle.Parent and root and root.Parent) do
+                RunService.Heartbeat:Wait()
+                vehicle = getOwnedVehicle()
+                root = vehicle and (vehicle:FindFirstChild("HumanoidRootPart") 
+                                  or vehicle:FindFirstChild("Base") 
+                                  or vehicle:FindFirstChildWhichIsA("BasePart"))
+            end
+            
+            local vel = root.Velocity
+            local movel = 0.1
+            
+            -- Apply upward fling
+            root.Velocity = vel * 10000 + Vector3.new(0, 10000, 0)
+            
+            RunService.RenderStepped:Wait()
+            if CarCookerActive and vehicle and vehicle.Parent and root and root.Parent then
+                root.Velocity = vel
+            end
+            
+            RunService.Stepped:Wait()
+            if CarCookerActive and vehicle and vehicle.Parent and root and root.Parent then
+                root.Velocity = vel + Vector3.new(0, movel, 0)
+                movel = movel * -1
+            end
+        until CarCookerActive == false
+    end)
+end
+
+local function stopCarCooker()
+    CarCookerActive = false
+    if carCookerThread then
+        task.cancel(carCookerThread)
+        carCookerThread = nil
+    end
+    -- Reset vehicle velocity (optional)
+    local vehicle = getOwnedVehicle()
+    if vehicle then
+        local root = vehicle:FindFirstChild("HumanoidRootPart") 
+                    or vehicle:FindFirstChild("Base") 
+                    or vehicle:FindFirstChildWhichIsA("BasePart")
+        if root then
+            root.Velocity = Vector3.zero
+            root.RotVelocity = Vector3.zero
+        end
+    end
+end
+
+local function toggleCarCooker()
+    if not CarCookerActive then
+        CarCookerActive = true
+        startCarCooker()
+        notify("Car Cooker ON")
+    else
+        stopCarCooker()
+        notify("Car Cooker OFF")
     end
 end
 
@@ -579,7 +680,7 @@ local function toggleRainbowVehicle()
                     changeVehicleColor(colors[idx % #colors + 1], veh)
                     idx = idx + 1
                 end
-                task.wait(0.2)
+                task.wait(0.01)
             end
         end)
         notify("Rainbow Vehicle ON")
@@ -604,7 +705,7 @@ local function toggleRainbowPhone()
                 end
                 Send("phone_color", colors[idx % #colors + 1])
                 idx = idx + 1
-                task.wait(0.2)
+                task.wait(0.01)
             end
         end)
         notify("Rainbow Phone ON")
@@ -1079,6 +1180,7 @@ addToggleButton("Anti Car Fling", function() return AntiCarFlingActive end, togg
 addToggleButton("Rainbow Vehicle", function() return RainbowVehActive end, toggleRainbowVehicle)
 addToggleButton("Rainbow Phone", function() return RainbowPhoneActive end, toggleRainbowPhone)
 addActionButton("NBA Quest", startNBAQuest)
+addToggleButton("Car Cooker", function() return CarCookerActive end, toggleCarCooker)
 addActionButton("Copy Avatar", openCopyAvatarGUI)
 
 local function updateCanvas()
@@ -1121,3 +1223,4 @@ end)
 local username = lp.DisplayName or lp.Name
 notify(string.format("✨ Luckey's Hub User: %s ✨", username), 5)
 print(string.format("Luckey's Hub loaded for %s", username))
+Send("bio", "Luckey's Hub User")

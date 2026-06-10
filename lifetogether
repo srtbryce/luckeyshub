@@ -1266,7 +1266,7 @@ AntiCarFlingToggle:OnChanged(function(value)
     if value ~= AntiCarFlingActive then toggleAntiCarFling() end
 end)
 
-local FlyToggle = Tabs.Vehicle:AddToggle("FlyToggle", {
+local FlyToggle = Tabs.Player:AddToggle("FlyToggle", {
     Title = "Fly",
     Description = "Fly across the map.",
     Default = false
@@ -1293,7 +1293,7 @@ QEFlyToggle:OnChanged(function(value)
     if value ~= QEfly then toggleQEfly() end
 end)
 
-local FlySpeedSlider = Tabs.Vehicle:AddSlider("FlySpeedSlider", {
+local FlySpeedSlider = Tabs.Player:AddSlider("FlySpeedSlider", {
     Title = "Fly Speed",
     Min = 0.5,
     Max = 10,

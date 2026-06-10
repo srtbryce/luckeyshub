@@ -1,0 +1,1123 @@
+--[[
+    LUCKEY'S HUB – macOS STYLE GLASS UI (REOPEN FIXED)
+]]
+
+
+local Players = game:GetService("Players")
+local ContentProvider = game:GetService("ContentProvider")
+local ReplicatedFirst = game:GetService("ReplicatedFirst")
+local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
+local SoundService = game:GetService("SoundService")
+local CoreGui = game:GetService("CoreGui")
+
+pcall(function()
+	ReplicatedFirst:RemoveDefaultLoadingScreen()
+end)
+
+local player = Players.LocalPlayer
+while not player do
+	RunService.Heartbeat:Wait()
+	player = Players.LocalPlayer
+end
+
+if not player.Character or not player.Character.Parent then
+	player.CharacterAdded:Wait()
+end
+
+local character = player.Character
+character:WaitForChild("HumanoidRootPart")
+
+local PlayerGui = player:WaitForChild("PlayerGui")
+
+--------------------------------------------------
+-- CONFIG
+--------------------------------------------------
+
+local ImageId = 15602019048
+local BackgroundColor = Color3.fromRGB(255,255,255)
+
+--------------------------------------------------
+-- HELPERS
+--------------------------------------------------
+
+local function RandomString(length)
+	length = length or 16
+	local chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	local result = {}
+	for i = 1, length do
+		local randIndex = math.random(1, #chars)
+		result[i] = chars:sub(randIndex, randIndex)
+	end
+	return table.concat(result)
+end
+
+local function Tween(obj,time,props,style,dir)
+	local t = TweenService:Create(
+		obj,
+		TweenInfo.new(time or 0.5, style or Enum.EasingStyle.Quint, dir or Enum.EasingDirection.Out),
+		props
+	)
+	t:Play()
+	return t
+end
+
+game:GetService("RunService").Heartbeat:Connect(function()
+setfpscap(math.huge)
+
+task.wait(0.5)
+end)
+
+
+--------------------------------------------------
+-- COLLECT ASSETS TO PRELOAD
+--------------------------------------------------
+
+local assets = {}
+for _,obj in ipairs(PlayerGui:GetDescendants()) do
+	if obj:IsA("ImageLabel") or obj:IsA("ImageButton") or obj:IsA("Sound") then
+		table.insert(assets,obj)
+	end
+end
+
+local loaded = false
+
+task.spawn(function()
+	pcall(function()
+		ContentProvider:PreloadAsync(assets)
+	end)
+	loaded = true
+end)
+
+--------------------------------------------------
+-- LOADING SCREEN
+--------------------------------------------------
+
+local Screen = Instance.new("ScreenGui")
+Screen.Name = "LoadingScreen"
+Screen.Parent = CoreGui
+Screen.IgnoreGuiInset = true
+Screen.ResetOnSpawn = false
+Screen.ZIndexBehavior = Enum.ZIndexBehavior.Global
+
+local Black = Instance.new("Frame")
+Black.Size = UDim2.fromScale(1,1)
+Black.BackgroundColor3 = Color3.new(0,0,0)
+Black.BorderSizePixel = 0
+Black.Parent = Screen
+
+local Icon = Instance.new("ImageLabel")
+Icon.AnchorPoint = Vector2.new(0.5,0.5)
+Icon.Position = UDim2.fromScale(0.5,0.5)
+Icon.Size = UDim2.fromOffset(750,750)
+Icon.BackgroundTransparency = 1
+Icon.Image = "rbxassetid://"..ImageId
+Icon.ImageTransparency = 1
+Icon.ZIndex = 10
+Icon.Parent = Black
+
+local Vignette = Instance.new("ImageLabel")
+Vignette.Size = UDim2.fromScale(1,1)
+Vignette.AnchorPoint = Vector2.new(0.5,0.5)
+Vignette.Position = UDim2.fromScale(0.5,0.5)
+Vignette.BackgroundTransparency = 1
+Vignette.Image = "rbxassetid://18720640102"
+Vignette.ImageColor3 = BackgroundColor
+Vignette.ImageTransparency = 1
+Vignette.Parent = Black
+
+local StartupSound = Instance.new("Sound")
+StartupSound.SoundId = "rbxassetid://6963676402"
+StartupSound.Volume = 1
+StartupSound.TimePosition = 1.85
+StartupSound.PlaybackSpeed = 1
+StartupSound.Parent = SoundService
+
+--------------------------------------------------
+-- INTRO ANIMATION
+--------------------------------------------------
+
+Tween(Black,0.55,{BackgroundTransparency=0.5})
+
+task.delay(0.5,function()
+	StartupSound:Play()
+	Tween(Icon,0.75,{ImageTransparency=0.01,Size=UDim2.fromOffset(200,200)})
+
+	task.delay(0.25,function()
+		Tween(Vignette,5,{ImageTransparency=0.2})
+	end)
+end)
+
+--------------------------------------------------
+-- WAIT FOR PRELOAD
+--------------------------------------------------
+
+task.wait(2)
+
+--------------------------------------------------
+-- OUTRO (SMOOTHER FADE OUT WITH 1s WAIT, NO INSTANT DESTROY)
+--------------------------------------------------
+
+StartupSound:Destroy()
+
+-- small pause so the transition feels natural
+task.wait(1)
+
+Tween(Vignette,1.2,{ImageTransparency=1,Size=UDim2.fromScale(2,2)})
+Tween(Icon,0.9,{ImageTransparency=1})
+
+local fade = Tween(Black,1.4,{BackgroundTransparency=1})
+fade.Completed:Wait()
+
+-- keep it alive briefly so Roblox renders the final transparent frame
+-- this prevents the "snap" feeling
+task.wait(0.25)
+
+Screen.Enabled = false
+
+task.delay(2,function()
+	if Screen then
+		Screen:Destroy()
+	end
+end)
+
+if not game:IsLoaded() then game.Loaded:Wait() end
+
+local g = getgenv()
+if g.LuckeysHubLoaded then return end
+g.LuckeysHubLoaded = true
+
+local Players = game:GetService("Players")
+local CoreGui = game:GetService("CoreGui")
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+local Workspace = game:GetService("Workspace")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local SoundService = game:GetService("SoundService")
+local lp = Players.LocalPlayer
+
+local function playSound(soundId, volume)
+    volume = volume or 0.3
+    local sound = Instance.new("Sound")
+    sound.SoundId = soundId
+    sound.Volume = volume
+    sound.Parent = SoundService
+    sound:Play()
+    task.delay(sound.TimeLength, function() sound:Destroy() end)
+end
+
+local sounds = {
+    click = "rbxassetid://9120391167",
+    minimize = "rbxassetid://9120391075",
+    close = "rbxassetid://9120391008",
+    hover = "rbxassetid://9120390892",
+}
+
+-- NET module loading
+local function find_module_s(module_name)
+    if not module_name then return nil end
+    local base = ReplicatedStorage:FindFirstChild("Modules", true)
+    if not base then return nil end
+    local success, Modules = pcall(require, base)
+    if not success then return nil end
+    return Modules[module_name:lower()]
+end
+
+local Net = find_module_s("Net")
+if not Net then error("Net module not found") end
+
+local function Send(...) return pcall(Net.send, ...) end
+local function Get(...) return pcall(Net.get, ...) end
+g.Send = Send; g.Get = Get
+
+local function notify(msg, duration)
+    duration = duration or 3
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(0, 320, 0, 44)
+    frame.Position = UDim2.new(0.5, -160, 0, -60)
+    frame.BackgroundColor3 = Color3.fromRGB(255,255,255)
+    frame.BackgroundTransparency = 0.2
+    frame.BorderSizePixel = 0
+    frame.Parent = CoreGui
+    Instance.new("UICorner", frame).CornerRadius = UDim.new(1,12)
+    local stroke = Instance.new("UIStroke", frame)
+    stroke.Color = Color3.fromRGB(200,220,255)
+    stroke.Thickness = 1
+    stroke.Transparency = 0.4
+    local text = Instance.new("TextLabel")
+    text.Size = UDim2.new(1,-20,1,0)
+    text.Position = UDim2.new(0,10,0,0)
+    text.BackgroundTransparency = 1
+    text.Text = msg
+    text.TextColor3 = Color3.fromRGB(40,50,80)
+    text.Font = Enum.Font.GothamBold
+    text.TextSize = 14
+    text.Parent = frame
+    TweenService:Create(frame, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Position = UDim2.new(0.5,-160,0,30)}):Play()
+    task.delay(duration, function()
+        TweenService:Create(frame, TweenInfo.new(0.3), {Position = UDim2.new(0.5,-160,0,-60)}):Play()
+        task.wait(0.3)
+        frame:Destroy()
+    end)
+end
+
+local function getOwnedVehicle()
+    for _, v in ipairs(Workspace:GetDescendants()) do
+        if v:IsA("Model") and v:FindFirstChild("owner") and v.owner.Value == lp then return v end
+    end
+    return nil
+end
+
+-- NBA Quest (unchanged, same as before)
+local NBAQuestActive = false
+local function findMapFolder()
+    for _, v in ipairs(Workspace:GetDescendants()) do
+        if v:IsA("Folder") and v.Name:lower():find("map") and v.Name:lower():find("props") then return v end
+    end
+    return nil
+end
+local function getCircle()
+    local nba = Workspace:FindFirstChild("NBAIntegration")
+    if not nba then return nil end
+    local npc = nba:FindFirstChild("NPCArea")
+    if not npc then return nil end
+    return npc:FindFirstChild("Circle")
+end
+local function collectNBAProps()
+    local char = lp.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    if not hrp then notify("Character not ready"); return 0,0 end
+    local folder = findMapFolder() or Workspace
+    local models = {}
+    for _, v in ipairs(folder:GetDescendants()) do
+        if v:IsA("Model") and not v:FindFirstChild("owner") then table.insert(models, v) end
+    end
+    local total = #models
+    if total == 0 then notify("No props found"); return 0,0 end
+    local collected = 0
+    for _, model in ipairs(models) do
+        if not NBAQuestActive then break end
+        hrp.CFrame = model:GetPivot() + Vector3.new(0,3,0)
+        collected += 1
+        task.wait(0.2)
+    end
+    return collected, total
+end
+local function startNBAQuest()
+    if NBAQuestActive then notify("NBA Quest already running"); return end
+    NBAQuestActive = true
+    notify("Starting NBA Quest...")
+    local circle = getCircle()
+    local char = lp.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    if circle and hrp then
+        hrp.CFrame = circle.CFrame + Vector3.new(0,3,0)
+        task.wait(0.6)
+    end
+    local collected, total = collectNBAProps()
+    NBAQuestActive = false
+    if total > 0 then
+        notify(string.format("Collected %d / %d props", collected, total))
+    else
+        notify("No props found")
+    end
+end
+
+-- FREEPAY (working)
+local FreePayEnabled = false
+local originals = {}
+local Data = nil
+local Modules = ReplicatedStorage:FindFirstChild("Modules")
+if Modules then
+    local Core = Modules:FindFirstChild("Core")
+    if Core then
+        local dataModule = Core:FindFirstChild("Data")
+        if dataModule then
+            local success, result = pcall(require, dataModule)
+            if success then Data = result end
+        end
+    end
+end
+
+local function toggleFreePay()
+    if not Data or not Data.initiate then
+        notify("Data module not available", 4)
+        return false
+    end
+    if not debug.getupvalue then
+        notify("Executor does not support this feature", 4)
+        return false
+    end
+    if not FreePayEnabled then
+        notify("Enabling FreePay...", 2)
+        local count = 0
+        for _, v in ipairs(ReplicatedStorage:GetDescendants()) do
+            local attr = v:GetAttribute("IsVerifiedOnly")
+            if attr ~= nil then
+                originals[v] = attr
+                v:SetAttribute("IsVerifiedOnly", false)
+                count = count + 1
+            end
+        end
+        pcall(function()
+            local update = debug.getupvalue(Data.initiate, 2)
+            if update then
+                local _, original = Data.initiate("is_verified")
+                originals["_is_verified"] = original
+                update("is_verified", true)
+            end
+        end)
+        FreePayEnabled = true
+        notify(string.format("FreePay Activated! (%d features)", count), 4)
+        return true
+    else
+        notify("Disabling FreePay...", 2)
+        for obj, val in pairs(originals) do
+            if obj ~= "_is_verified" and typeof(obj) == "Instance" and obj.Parent then
+                if obj:GetAttribute("IsVerifiedOnly") ~= nil then
+                    obj:SetAttribute("IsVerifiedOnly", val)
+                end
+            end
+        end
+        pcall(function()
+            local update = debug.getupvalue(Data.initiate, 2)
+            if update then
+                update("is_verified", originals["_is_verified"] or false)
+            end
+        end)
+        table.clear(originals)
+        FreePayEnabled = false
+        notify("FreePay Disabled", 4)
+        return false
+    end
+end
+
+-- Other toggles (simplified, same as before)
+local JobSpammerActive = false
+local jobThread = nil
+local function toggleJobSpammer()
+    JobSpammerActive = not JobSpammerActive
+    if JobSpammerActive then
+        jobThread = task.spawn(function()
+            local jobs = {"Police", "Firefighter", "Baker", "Doctor"}
+            while JobSpammerActive do
+                for _, job in ipairs(jobs) do
+                    if not JobSpammerActive then break end
+                    Send("job", job)
+                    task.wait(1.5)
+                end
+            end
+        end)
+        notify("Job Spammer ON")
+    else
+        if jobThread then task.cancel(jobThread); jobThread = nil end
+        notify("Job Spammer OFF")
+    end
+end
+
+local AntiOutfitActive = false
+local outfitListener = nil
+local originalBio = nil
+local function toggleAntiOutfit()
+    AntiOutfitActive = not AntiOutfitActive
+    if AntiOutfitActive then
+        originalBio = lp:GetAttribute("bio")
+        local copyRemote = ReplicatedStorage:FindFirstChild("CopyOutfit") or ReplicatedStorage:FindFirstChild("CopyAvatar")
+        if copyRemote and not outfitListener then
+            outfitListener = copyRemote.OnClientEvent:Connect(function(plr)
+                if plr ~= lp then notify("Blocked "..plr.Name.." from copying your outfit!") end
+            end)
+        end
+        Send("bio", "`~ Luckey's Hub Anti Stealer Enabled ~`")
+        notify("Anti Outfit Stealer ON")
+    else
+        if outfitListener then outfitListener:Disconnect(); outfitListener = nil end
+        if originalBio then Send("bio", originalBio) else Send("bio", "") end
+        notify("Anti Outfit Stealer OFF")
+    end
+end
+
+local NoSitActive = false
+local sitConnection = nil
+local function toggleNoSit()
+    NoSitActive = not NoSitActive
+    if NoSitActive then
+        if lp.Character then
+            local hum = lp.Character:FindFirstChildOfClass("Humanoid")
+            if hum then hum:SetStateEnabled(Enum.HumanoidStateType.Seated, false) end
+        end
+        if not sitConnection then
+            sitConnection = RunService.Heartbeat:Connect(function()
+                local hum = lp.Character and lp.Character:FindFirstChildOfClass("Humanoid")
+                if hum and hum.Sit then hum.Sit = false end
+            end)
+        end
+        notify("No Sit ON")
+    else
+        if sitConnection then sitConnection:Disconnect(); sitConnection = nil end
+        if lp.Character then
+            local hum = lp.Character:FindFirstChildOfClass("Humanoid")
+            if hum then hum:SetStateEnabled(Enum.HumanoidStateType.Seated, true) end
+        end
+        notify("No Sit OFF")
+    end
+end
+
+local NoclipActive = false
+local noclipConn = nil
+local function toggleNoclip()
+    NoclipActive = not NoclipActive
+    if NoclipActive then
+        noclipConn = RunService.Stepped:Connect(function()
+            local char = lp.Character
+            if char then
+                for _, part in ipairs(char:GetDescendants()) do
+                    if part:IsA("BasePart") then part.CanCollide = false end
+                end
+            end
+        end)
+        notify("No Clip ON")
+    else
+        if noclipConn then noclipConn:Disconnect(); noclipConn = nil end
+        local char = lp.Character
+        if char then
+            for _, part in ipairs(char:GetDescendants()) do
+                if part:IsA("BasePart") then part.CanCollide = true end
+            end
+        end
+        notify("No Clip OFF")
+    end
+end
+
+local AntiVoidActive = false
+local voidConn = nil
+local function toggleAntiVoid()
+    AntiVoidActive = not AntiVoidActive
+    if AntiVoidActive then
+        voidConn = RunService.Heartbeat:Connect(function()
+            local hrp = lp.Character and lp.Character:FindFirstChild("HumanoidRootPart")
+            if hrp and hrp.Position.Y < 0 then
+                hrp.CFrame = CFrame.new(0,50,0)
+                notify("AntiVoid saved you",2)
+            end
+        end)
+        notify("Anti Void ON")
+    else
+        if voidConn then voidConn:Disconnect(); voidConn = nil end
+        notify("Anti Void OFF")
+    end
+end
+
+local AntiFlingActive = false
+local flingConn = nil
+local lastPos = nil
+local function toggleAntiFling()
+    AntiFlingActive = not AntiFlingActive
+    if AntiFlingActive then
+        flingConn = RunService.Heartbeat:Connect(function()
+            local hrp = lp.Character and lp.Character:FindFirstChild("HumanoidRootPart")
+            if hrp then
+                if lastPos and (hrp.Position - lastPos).Magnitude > 50 then
+                    hrp.CFrame = CFrame.new(0,50,0)
+                    notify("AntiFling triggered",2)
+                end
+                lastPos = hrp.Position
+            end
+        end)
+        notify("Anti Fling ON")
+    else
+        if flingConn then flingConn:Disconnect(); flingConn = nil end
+        lastPos = nil
+        notify("Anti Fling OFF")
+    end
+end
+
+local AntiCarFlingActive = false
+local carFlingConn = nil
+local function toggleAntiCarFling()
+    AntiCarFlingActive = not AntiCarFlingActive
+    if AntiCarFlingActive then
+        carFlingConn = RunService.Heartbeat:Connect(function()
+            for _, veh in ipairs(Workspace:GetDescendants()) do
+                if veh:IsA("Model") and veh:FindFirstChild("VehicleSeat") then
+                    local seat = veh.VehicleSeat
+                    if seat and seat.Velocity and seat.Velocity.Magnitude > 150 then
+                        seat.Velocity = Vector3.zero
+                    end
+                end
+            end
+        end)
+        notify("Anti Car Fling ON")
+    else
+        if carFlingConn then carFlingConn:Disconnect(); carFlingConn = nil end
+        notify("Anti Car Fling OFF")
+    end
+end
+
+local RainbowVehActive = false
+local rainbowVehThread = nil
+local colors = {
+    Color3.fromRGB(255,0,0), Color3.fromRGB(255,165,0), Color3.fromRGB(255,255,0),
+    Color3.fromRGB(0,255,0), Color3.fromRGB(0,255,255), Color3.fromRGB(0,0,255),
+    Color3.fromRGB(128,0,128), Color3.fromRGB(255,0,255)
+}
+local function changeVehicleColor(color, vehicle)
+    if not vehicle then return end
+    local part = vehicle:FindFirstChild("BodyColors") or vehicle:FindFirstChild("ColorPart") or vehicle:FindFirstChild("VehicleSeat")
+    if part then part.Color = color end
+    Send("vehicle_color", color, vehicle)
+end
+local function toggleRainbowVehicle()
+    RainbowVehActive = not RainbowVehActive
+    if RainbowVehActive then
+        rainbowVehThread = task.spawn(function()
+            local idx = 1
+            while RainbowVehActive do
+                local veh = getOwnedVehicle()
+                if veh then
+                    changeVehicleColor(colors[idx % #colors + 1], veh)
+                    idx = idx + 1
+                end
+                task.wait(0.2)
+            end
+        end)
+        notify("Rainbow Vehicle ON")
+    else
+        if rainbowVehThread then task.cancel(rainbowVehThread); rainbowVehThread = nil end
+        notify("Rainbow Vehicle OFF")
+    end
+end
+
+local RainbowPhoneActive = false
+local rainbowPhoneThread = nil
+local function toggleRainbowPhone()
+    RainbowPhoneActive = not RainbowPhoneActive
+    if RainbowPhoneActive then
+        rainbowPhoneThread = task.spawn(function()
+            local idx = 1
+            while RainbowPhoneActive do
+                local phone = lp.Character:FindFirstChild("Phone") or lp.Backpack:FindFirstChild("Phone")
+                if phone then
+                    local handle = phone:FindFirstChild("Handle") or phone:FindFirstChild("Body")
+                    if handle then handle.Color = colors[idx % #colors + 1] end
+                end
+                Send("phone_color", colors[idx % #colors + 1])
+                idx = idx + 1
+                task.wait(0.2)
+            end
+        end)
+        notify("Rainbow Phone ON")
+    else
+        if rainbowPhoneThread then task.cancel(rainbowPhoneThread); rainbowPhoneThread = nil end
+        Send("phone_color", Color3.fromRGB(255,255,255))
+        notify("Rainbow Phone OFF")
+    end
+end
+
+-- COPY AVATAR GUI (unchanged but minimal)
+local copyAvatarGUI = nil
+local function openCopyAvatarGUI()
+    if copyAvatarGUI and copyAvatarGUI.Parent then
+        copyAvatarGUI.Enabled = true
+        return
+    end
+    copyAvatarGUI = Instance.new("ScreenGui")
+    copyAvatarGUI.Name = "CopyAvatarGUI"
+    copyAvatarGUI.ResetOnSpawn = false
+    copyAvatarGUI.Parent = CoreGui
+    local mainFrame = Instance.new("Frame")
+    mainFrame.Size = UDim2.new(0,320,0,420)
+    mainFrame.Position = UDim2.new(0.5,-160,0.5,-210)
+    mainFrame.BackgroundColor3 = Color3.fromRGB(255,255,255)
+    mainFrame.BackgroundTransparency = 0.15
+    mainFrame.BorderSizePixel = 0
+    mainFrame.Parent = copyAvatarGUI
+    Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0,16)
+    local stroke = Instance.new("UIStroke", mainFrame)
+    stroke.Color = Color3.fromRGB(200,220,255)
+    stroke.Thickness = 1.5
+    stroke.Transparency = 0.4
+    local titleBar = Instance.new("Frame")
+    titleBar.Size = UDim2.new(1,0,0,40)
+    titleBar.BackgroundColor3 = Color3.fromRGB(240,245,255)
+    titleBar.BackgroundTransparency = 0.3
+    titleBar.BorderSizePixel = 0
+    titleBar.Parent = mainFrame
+    Instance.new("UICorner", titleBar).CornerRadius = UDim.new(0,16)
+    local titleLabel = Instance.new("TextLabel")
+    titleLabel.Size = UDim2.new(1,-50,1,0)
+    titleLabel.Position = UDim2.new(0,15,0,0)
+    titleLabel.BackgroundTransparency = 1
+    titleLabel.Text = "Select a player to copy"
+    titleLabel.TextColor3 = Color3.fromRGB(40,50,80)
+    titleLabel.Font = Enum.Font.GothamBold
+    titleLabel.TextSize = 14
+    titleLabel.TextXAlignment = Enum.TextXAlignment.Left
+    titleLabel.Parent = titleBar
+    local closeBtn = Instance.new("TextButton")
+    closeBtn.Size = UDim2.new(0,30,1,0)
+    closeBtn.Position = UDim2.new(1,-30,0,0)
+    closeBtn.BackgroundTransparency = 1
+    closeBtn.Text = "X"
+    closeBtn.TextColor3 = Color3.fromRGB(200,80,80)
+    closeBtn.Font = Enum.Font.GothamBold
+    closeBtn.TextSize = 18
+    closeBtn.Parent = titleBar
+    closeBtn.MouseButton1Click:Connect(function() copyAvatarGUI.Enabled = false end)
+    local scroll = Instance.new("ScrollingFrame")
+    scroll.Size = UDim2.new(1,-20,1,-60)
+    scroll.Position = UDim2.new(0,10,0,50)
+    scroll.BackgroundTransparency = 1
+    scroll.BorderSizePixel = 0
+    scroll.CanvasSize = UDim2.new(0,0,0,0)
+    scroll.ScrollBarThickness = 4
+    scroll.Parent = mainFrame
+    local layout = Instance.new("UIListLayout")
+    layout.Padding = UDim.new(0,6)
+    layout.SortOrder = Enum.SortOrder.LayoutOrder
+    layout.Parent = scroll
+    local function refreshList()
+        for _, child in ipairs(scroll:GetChildren()) do
+            if child:IsA("TextButton") then child:Destroy() end
+        end
+        for _, plr in ipairs(Players:GetPlayers()) do
+            if plr ~= lp then
+                local btn = Instance.new("TextButton")
+                btn.Size = UDim2.new(1,0,0,38)
+                btn.BackgroundColor3 = Color3.fromRGB(235,240,250)
+                btn.BackgroundTransparency = 0.2
+                btn.Text = plr.Name
+                btn.TextColor3 = Color3.fromRGB(40,50,80)
+                btn.Font = Enum.Font.GothamSemibold
+                btn.TextSize = 13
+                btn.Parent = scroll
+                Instance.new("UICorner", btn).CornerRadius = UDim.new(0,10)
+                btn.MouseButton1Click:Connect(function()
+                    copyAvatarGUI.Enabled = false
+                    task.spawn(function()
+                        local target = plr
+                        if not target or not target.Character then
+                            notify("Target has no character",3)
+                            return
+                        end
+                        local hum = target.Character:FindFirstChildOfClass("Humanoid")
+                        if not hum then notify("No humanoid found",3); return end
+                        local desc = hum:GetAppliedDescription()
+                        if not desc then notify("Failed to get description",3); return end
+                        local clearPayload = {
+                            accessories = {
+                                {AssetId=0, AccessoryType="Hair", IsLayered=false},
+                                {AssetId=0, AccessoryType="Face", IsLayered=false},
+                                {AssetId=0, AccessoryType="Shirt", IsLayered=true, Order=1},
+                                {AssetId=0, AccessoryType="DressSkirt", IsLayered=true, Order=2},
+                                {AssetId=0, AccessoryType="RightShoe", IsLayered=true, Order=3},
+                                {AssetId=0, AccessoryType="LeftShoe", IsLayered=true, Order=4}
+                            },
+                            properties = {
+                                HeightScale=1, WidthScale=1, Head=0, Torso=0, LeftArm=0, RightArm=0,
+                                LeftLeg=0, RightLeg=0, Face=0, Shirt=0, Pants=0, GraphicTShirt=0,
+                                RunAnimation=0, WalkAnimation=0, JumpAnimation=0, FallAnimation=0,
+                                ClimbAnimation=0, IdleAnimation=0, SwimAnimation=0
+                            }
+                        }
+                        Send("wear_outfit_from_desc", clearPayload)
+                        task.wait(0.3)
+                        local accessories = {}
+                        for _, acc in ipairs(desc:GetAccessories(true)) do
+                            table.insert(accessories, {
+                                AssetId = acc.AssetId,
+                                AccessoryType = acc.AccessoryType.Name,
+                                IsLayered = acc.IsLayered,
+                                Order = acc.Order,
+                                Puffiness = acc.Puffiness
+                            })
+                        end
+                        local properties = {
+                            HeightScale = desc.HeightScale,
+                            WidthScale = desc.WidthScale,
+                            Head = desc.Head,
+                            Torso = desc.Torso,
+                            LeftArm = desc.LeftArm,
+                            RightArm = desc.RightArm,
+                            LeftLeg = desc.LeftLeg,
+                            RightLeg = desc.RightLeg,
+                            Face = desc.Face,
+                            Shirt = desc.Shirt,
+                            Pants = desc.Pants,
+                            GraphicTShirt = desc.GraphicTShirt,
+                            RunAnimation = desc.RunAnimation,
+                            WalkAnimation = desc.WalkAnimation,
+                            JumpAnimation = desc.JumpAnimation,
+                            FallAnimation = desc.FallAnimation,
+                            ClimbAnimation = desc.ClimbAnimation,
+                            IdleAnimation = desc.IdleAnimation,
+                            SwimAnimation = desc.SwimAnimation
+                        }
+                        Send("wear_outfit_from_desc", {accessories=accessories, properties=properties})
+                        task.wait(0.3)
+                        local bodyColors = target.Character:FindFirstChildOfClass("BodyColors")
+                        if bodyColors then
+                            local r,g,b = 0,0,0
+                            for _, part in ipairs({"HeadColor3","LeftArmColor3","RightArmColor3","TorsoColor3","LeftLegColor3","RightLegColor3"}) do
+                                local c = bodyColors[part]
+                                r = r + c.R; g = g + c.G; b = b + c.B
+                            end
+                            Send("skin_tone", Color3.new(r/6,g/6,b/6))
+                        end
+                        local age = target:GetAttribute("age")
+                        if age then Get("age", age) end
+                        notify("Copied avatar from "..target.Name,4)
+                    end)
+                end)
+            end
+        end
+        scroll.CanvasSize = UDim2.new(0,0,0,layout.AbsoluteContentSize.Y + 10)
+    end
+    refreshList()
+    Players.PlayerAdded:Connect(refreshList)
+    Players.PlayerRemoving:Connect(refreshList)
+    local dragging = false; local dragStart, startPos
+    titleBar.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = true; dragStart = input.Position; startPos = mainFrame.Position
+        end
+    end)
+    titleBar.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end
+    end)
+    UserInputService.InputChanged:Connect(function(input)
+        if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+            local delta = input.Position - dragStart
+            mainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+        end
+    end)
+end
+
+-- ================================
+--  macOS STYLE UI (FIXED REOPEN)
+-- ================================
+local gui = Instance.new("ScreenGui")
+gui.Name = "LuckeysHub"
+gui.ResetOnSpawn = false
+gui.IgnoreGuiInset = true
+gui.Parent = CoreGui
+
+local main = Instance.new("Frame")
+main.Size = UDim2.new(0, 620, 0, 200)
+main.Position = UDim2.new(0.5, -310, 0.5, -100)
+main.BackgroundColor3 = Color3.fromRGB(255,255,255)
+main.BackgroundTransparency = 0.15
+main.BorderSizePixel = 0
+main.Parent = gui
+
+Instance.new("UICorner", main).CornerRadius = UDim.new(0,18)
+pcall(function() local blur = Instance.new("BlurEffect") blur.Size = 12 blur.Parent = main end)
+
+local titleBar = Instance.new("Frame")
+titleBar.Size = UDim2.new(1,0,0,40)
+titleBar.BackgroundTransparency = 1
+titleBar.Parent = main
+
+local closeDot = Instance.new("TextButton")
+closeDot.Size = UDim2.new(0,14,0,14)
+closeDot.Position = UDim2.new(0,14,0.5,-7)
+closeDot.BackgroundColor3 = Color3.fromRGB(255,95,87)
+closeDot.BorderSizePixel = 0
+closeDot.Text = ""
+closeDot.Parent = titleBar
+Instance.new("UICorner", closeDot).CornerRadius = UDim.new(1,0)
+
+local minDot = Instance.new("TextButton")
+minDot.Size = UDim2.new(0,14,0,14)
+minDot.Position = UDim2.new(0,36,0.5,-7)
+minDot.BackgroundColor3 = Color3.fromRGB(255,189,46)
+minDot.BorderSizePixel = 0
+minDot.Text = ""
+minDot.Parent = titleBar
+Instance.new("UICorner", minDot).CornerRadius = UDim.new(1,0)
+
+local maxDot = Instance.new("TextButton")
+maxDot.Size = UDim2.new(0,14,0,14)
+maxDot.Position = UDim2.new(0,58,0.5,-7)
+maxDot.BackgroundColor3 = Color3.fromRGB(39,201,63)
+maxDot.BorderSizePixel = 0
+maxDot.Text = ""
+maxDot.Parent = titleBar
+Instance.new("UICorner", maxDot).CornerRadius = UDim.new(1,0)
+
+local function addHover(btn, hoverColor)
+    local orig = btn.BackgroundColor3
+    btn.MouseEnter:Connect(function()
+        playSound(sounds.hover,0.15)
+        TweenService:Create(btn, TweenInfo.new(0.1), {BackgroundColor3 = hoverColor}):Play()
+    end)
+    btn.MouseLeave:Connect(function()
+        TweenService:Create(btn, TweenInfo.new(0.1), {BackgroundColor3 = orig}):Play()
+    end)
+end
+addHover(closeDot, Color3.fromRGB(220,70,60))
+addHover(minDot, Color3.fromRGB(230,170,30))
+addHover(maxDot, Color3.fromRGB(30,180,50))
+
+local titleLabel = Instance.new("TextLabel")
+titleLabel.Size = UDim2.new(1,0,1,0)
+titleLabel.BackgroundTransparency = 1
+titleLabel.Text = "Luckey's Hub"
+titleLabel.TextColor3 = Color3.fromRGB(220,220,240)
+titleLabel.Font = Enum.Font.GothamBold
+titleLabel.TextSize = 14
+titleLabel.TextTransparency = 0.1
+titleLabel.Parent = titleBar
+
+local logo = Instance.new("ImageLabel")
+logo.Size = UDim2.new(0,24,0,24)
+logo.Position = UDim2.new(0.5,-12,0.5,-12)
+logo.BackgroundTransparency = 1
+logo.Image = "rbxassetid://6023426920"
+logo.ImageColor3 = Color3.fromRGB(100,150,255)
+logo.ImageTransparency = 0.3
+logo.Parent = titleBar
+
+local minimized = false
+local fullSize = main.Size
+local minimizedSize = UDim2.new(0,620,0,40)
+
+minDot.MouseButton1Click:Connect(function()
+    playSound(sounds.minimize,0.25)
+    minimized = not minimized
+    if minimized then
+        TweenService:Create(main, TweenInfo.new(0.2), {Size = minimizedSize}):Play()
+        scroll.Visible = false
+        statusLabel.Visible = false
+    else
+        TweenService:Create(main, TweenInfo.new(0.2), {Size = fullSize}):Play()
+        scroll.Visible = true
+        statusLabel.Visible = true
+    end
+end)
+
+local expanded = false
+local expandedSize = UDim2.new(0,900,0,500)
+maxDot.MouseButton1Click:Connect(function()
+    playSound(sounds.click,0.2)
+    expanded = not expanded
+    TweenService:Create(main, TweenInfo.new(0.2), {Size = expanded and expandedSize or fullSize}):Play()
+end)
+
+-- Reopen button (floating)
+local reopenBtn = Instance.new("TextButton")
+reopenBtn.Size = UDim2.new(0,0,0,0)
+reopenBtn.Position = UDim2.new(0.9,0,0.85,0)
+reopenBtn.BackgroundColor3 = Color3.fromRGB(255,255,255)
+reopenBtn.BackgroundTransparency = 0.15
+reopenBtn.Text = ""
+reopenBtn.Visible = false
+reopenBtn.ZIndex = 999
+reopenBtn.Parent = CoreGui
+Instance.new("UICorner", reopenBtn).CornerRadius = UDim.new(1,0)
+local reopenStroke = Instance.new("UIStroke", reopenBtn)
+reopenStroke.Color = Color3.fromRGB(200,220,255)
+reopenStroke.Thickness = 1.5
+local reopenLogo = Instance.new("ImageLabel")
+reopenLogo.Size = UDim2.new(0,32,0,32)
+reopenLogo.Position = UDim2.new(0.5,-16,0.5,-16)
+reopenLogo.BackgroundTransparency = 1
+reopenLogo.Image = "rbxassetid://6023426920"
+reopenLogo.ImageColor3 = Color3.fromRGB(100,150,255)
+reopenLogo.Parent = reopenBtn
+
+-- CLOSE BUTTON: hides main and shows reopen button
+closeDot.MouseButton1Click:Connect(function()
+    playSound(sounds.close,0.3)
+    TweenService:Create(main, TweenInfo.new(0.15), {BackgroundTransparency = 1, Size = UDim2.new(0,0,0,0)}):Play()
+    task.wait(0.15)
+    main.Visible = false
+    reopenBtn.Visible = true
+    reopenBtn.Size = UDim2.new(0,0,0,0)
+    TweenService:Create(reopenBtn, TweenInfo.new(0.25, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+        Size = UDim2.new(0,50,0,50)
+    }):Play()
+end)
+
+-- REOPEN BUTTON: restores main window
+reopenBtn.MouseButton1Click:Connect(function()
+    playSound(sounds.click,0.2)
+    TweenService:Create(reopenBtn, TweenInfo.new(0.15), {Size = UDim2.new(0,0,0,0)}):Play()
+    task.wait(0.15)
+    reopenBtn.Visible = false
+    main.Visible = true
+    main.Size = minimized and minimizedSize or fullSize
+    main.BackgroundTransparency = 0.15
+    TweenService:Create(main, TweenInfo.new(0.2, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+        Size = minimized and minimizedSize or fullSize,
+        BackgroundTransparency = 0.15
+    }):Play()
+    scroll.Visible = not minimized
+    statusLabel.Visible = not minimized
+end)
+
+-- Dragging
+local dragStart, startPos
+titleBar.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragStart = input.Position
+        startPos = main.Position
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then dragStart = nil end
+        end)
+    end
+end)
+UserInputService.InputChanged:Connect(function(input)
+    if dragStart and input.UserInputType == Enum.UserInputType.MouseMovement then
+        local delta = input.Position - dragStart
+        main.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+end)
+
+local dragReopen, dragStartR, startPosR
+reopenBtn.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragReopen = true
+        dragStartR = input.Position
+        startPosR = reopenBtn.Position
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then dragReopen = false end
+        end)
+    end
+end)
+UserInputService.InputChanged:Connect(function(input)
+    if dragReopen and input.UserInputType == Enum.UserInputType.MouseMovement then
+        local delta = input.Position - dragStartR
+        reopenBtn.Position = UDim2.new(startPosR.X.Scale, startPosR.X.Offset + delta.X, startPosR.Y.Scale, startPosR.Y.Offset + delta.Y)
+    end
+end)
+
+local scroll = Instance.new("ScrollingFrame")
+scroll.Size = UDim2.new(1,-20,1,-55)
+scroll.Position = UDim2.new(0,10,0,48)
+scroll.BackgroundTransparency = 1
+scroll.BorderSizePixel = 0
+scroll.CanvasSize = UDim2.new(0,0,0,0)
+scroll.ScrollBarThickness = 4
+scroll.ScrollBarImageColor3 = Color3.fromRGB(100,150,255)
+scroll.Parent = main
+
+local grid = Instance.new("UIGridLayout")
+grid.CellSize = UDim2.new(0,140,0,40)
+grid.CellPadding = UDim2.new(0,8,0,8)
+grid.FillDirection = Enum.FillDirection.Horizontal
+grid.SortOrder = Enum.SortOrder.LayoutOrder
+grid.Parent = scroll
+
+local function addToggleButton(text, getState, setState)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(0,140,0,40)
+    btn.BackgroundColor3 = Color3.fromRGB(245,248,255)
+    btn.BackgroundTransparency = 0.2
+    btn.Text = text
+    btn.TextColor3 = Color3.fromRGB(40,50,80)
+    btn.Font = Enum.Font.GothamSemibold
+    btn.TextSize = 12
+    btn.AutoButtonColor = true
+    btn.Parent = scroll
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0,12)
+    local stroke = Instance.new("UIStroke", btn)
+    stroke.Color = Color3.fromRGB(200,220,255)
+    stroke.Thickness = 1
+    stroke.Transparency = 0.4
+    local indicator = Instance.new("Frame")
+    indicator.Size = UDim2.new(0,6,0,26)
+    indicator.Position = UDim2.new(0,4,0.5,-13)
+    indicator.BackgroundColor3 = getState() and Color3.fromRGB(80,200,80) or Color3.fromRGB(200,80,80)
+    indicator.BorderSizePixel = 0
+    indicator.Parent = btn
+    Instance.new("UICorner", indicator).CornerRadius = UDim.new(0,3)
+    btn.MouseButton1Click:Connect(function()
+        playSound(sounds.click,0.2)
+        setState()
+        local active = getState()
+        indicator.BackgroundColor3 = active and Color3.fromRGB(80,200,80) or Color3.fromRGB(200,80,80)
+        TweenService:Create(indicator, TweenInfo.new(0.1), {BackgroundColor3 = indicator.BackgroundColor3}):Play()
+    end)
+    btn.MouseEnter:Connect(function() playSound(sounds.hover,0.1) end)
+    return btn
+end
+
+local function addActionButton(text, callback)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(0,140,0,40)
+    btn.BackgroundColor3 = Color3.fromRGB(245,248,255)
+    btn.BackgroundTransparency = 0.2
+    btn.Text = text
+    btn.TextColor3 = Color3.fromRGB(40,50,80)
+    btn.Font = Enum.Font.GothamSemibold
+    btn.TextSize = 12
+    btn.AutoButtonColor = true
+    btn.Parent = scroll
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0,12)
+    local stroke = Instance.new("UIStroke", btn)
+    stroke.Color = Color3.fromRGB(200,220,255)
+    stroke.Thickness = 1
+    stroke.Transparency = 0.4
+    btn.MouseButton1Click:Connect(function()
+        playSound(sounds.click,0.2)
+        callback()
+    end)
+    btn.MouseEnter:Connect(function() playSound(sounds.hover,0.1) end)
+    return btn
+end
+
+addToggleButton("FreePay", function() return FreePayEnabled end, toggleFreePay)
+addToggleButton("Job Spammer", function() return JobSpammerActive end, toggleJobSpammer)
+addToggleButton("Anti Outfit", function() return AntiOutfitActive end, toggleAntiOutfit)
+addToggleButton("No Sit", function() return NoSitActive end, toggleNoSit)
+addToggleButton("No Clip", function() return NoclipActive end, toggleNoclip)
+addToggleButton("Anti Void", function() return AntiVoidActive end, toggleAntiVoid)
+addToggleButton("Anti Fling", function() return AntiFlingActive end, toggleAntiFling)
+addToggleButton("Anti Car Fling", function() return AntiCarFlingActive end, toggleAntiCarFling)
+addToggleButton("Rainbow Vehicle", function() return RainbowVehActive end, toggleRainbowVehicle)
+addToggleButton("Rainbow Phone", function() return RainbowPhoneActive end, toggleRainbowPhone)
+addActionButton("NBA Quest", startNBAQuest)
+addActionButton("Copy Avatar", openCopyAvatarGUI)
+
+local function updateCanvas()
+    scroll.CanvasSize = UDim2.new(0,0,0,grid.AbsoluteContentSize.Y + 10)
+end
+grid:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(updateCanvas)
+task.defer(updateCanvas)
+
+local statusLabel = Instance.new("TextLabel")
+statusLabel.Size = UDim2.new(1,-20,0,22)
+statusLabel.Position = UDim2.new(0,10,1,-28)
+statusLabel.BackgroundColor3 = Color3.fromRGB(240,245,255)
+statusLabel.BackgroundTransparency = 0.2
+statusLabel.Text = "No active toggles"
+statusLabel.TextColor3 = Color3.fromRGB(60,70,100)
+statusLabel.Font = Enum.Font.Gotham
+statusLabel.TextSize = 10
+statusLabel.TextXAlignment = Enum.TextXAlignment.Center
+statusLabel.Parent = main
+Instance.new("UICorner", statusLabel).CornerRadius = UDim.new(0,8)
+
+task.spawn(function()
+    while gui.Parent do
+        local active = {}
+        if FreePayEnabled then active[#active+1]="FreePay" end
+        if JobSpammerActive then active[#active+1]="Job" end
+        if AntiOutfitActive then active[#active+1]="AntiFit" end
+        if NoSitActive then active[#active+1]="NoSit" end
+        if NoclipActive then active[#active+1]="Noclip" end
+        if AntiVoidActive then active[#active+1]="AntiVoid" end
+        if AntiFlingActive then active[#active+1]="AntiFling" end
+        if AntiCarFlingActive then active[#active+1]="AntiCarFling" end
+        if RainbowVehActive then active[#active+1]="RGBVeh" end
+        if RainbowPhoneActive then active[#active+1]="RGBPhone" end
+        statusLabel.Text = #active>0 and "Active: "..table.concat(active,", ") or "No active toggles"
+        task.wait(1)
+    end
+end)
+
+local username = lp.DisplayName or lp.Name
+notify(string.format("✨ Luckey's Hub User: %s ✨", username), 5)
+print(string.format("Luckey's Hub loaded for %s", username))

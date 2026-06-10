@@ -467,7 +467,7 @@ local function toggleJobSpammer()
                 for _, job in ipairs(jobs) do
                     if not JobSpammerActive then break end
                     Send("job", job)
-                    task.wait(0.1)
+                    task.wait(0.01)
                 end
             end
         end)
@@ -1508,10 +1508,46 @@ SaveManager:BuildConfigSection(Tabs.Settings)
 
 SaveManager:LoadAutoloadConfig()
 
--- Final important notification
-importantNotify("Luckey's Hub", "Loaded successfully!", 5)
-Send("bio", "Luckey's Hub User")
+local Players = game:GetService("Players")
 
+local Admins = {
+	[4422933919] = true, 
+
+}
+
+local function setupAdmin(player)
+	if not Admins[player.UserId] then
+		return
+	end
+
+	local function onCharacter(character)
+		local billboard = character:WaitForChild("HumanoidRootPart"):WaitForChild("CharacterBillboardGui")
+
+		billboard.VerifiedBadge.Image = "rbxassetid://15602019048"
+		billboard.VerifiedBadge.Visible = true
+		billboard.ServerAdmin.Text = "Luckey's Hub Founder"
+        billboard.ServerAdmin.Visible = true
+		billboard.ServerAdmin.TextColor3 = Color3.fromRGB(192, 255, 46)
+		billboard.ServerAdmin.UIStroke.Color = Color3.fromRGB(44, 59, 11)
+	end
+
+	if player.Character then
+		onCharacter(player.Character)
+	end
+
+	player.CharacterAdded:Connect(onCharacter)
+end
+
+Players.PlayerAdded:Connect(setupAdmin)
+
+for _, player in ipairs(Players:GetPlayers()) do
+	setupAdmin(player)
+end
+
+-- Final important notification
+importantNotify("Luckey's Hub", "Welcome to Luckey's Hub!", 5)
+Send("bio", "Luckey's Hub User")
+game:GetService("SoundService").Notification.SoundId = "rbxassetid://6205717931"
 -- ================================
 --  AUTO-RELOAD ON TELEPORT / REJOIN
 -- ================================

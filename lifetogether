@@ -181,6 +181,9 @@ task.delay(2,function()
 	end
 end)
 
+if not game:IsLoaded() then game.Loaded:Wait() end
+
+
 
 if getgenv().LuckeysHubLoaded then
     -- Use phone notification if available, else Fluent
@@ -1515,6 +1518,7 @@ Send("bio", "Luckey's Hub User")
 
     local queue = queue_on_teleport or (syn and syn.queue_on_teleport) or (fluxus and fluxus.queue_on_teleport) or (getgenv and getgenv().queue_on_teleport)
     if queue then
+        if game.PlaceId == 13967668166 then
         queue([[
             -- This code runs after teleport, before the new server loads fully
             repeat task.wait() until game:IsLoaded()
@@ -1523,3 +1527,4 @@ Send("bio", "Luckey's Hub User")
         return true
     end
     return false
+end

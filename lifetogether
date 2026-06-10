@@ -181,12 +181,13 @@ task.delay(2,function()
 	end
 end)
 
--- Already loaded detector
+
 if getgenv().LuckeysHubLoaded then
     -- Use phone notification if available, else Fluent
     local success, Phone = pcall(function()
         return require(game:GetService("ReplicatedStorage"):WaitForChild("Modules"):WaitForChild("Game"):WaitForChild("Phone"))
     end)
+    
     if success and Phone then
         pcall(function()
             Phone.new_notification({
@@ -402,11 +403,11 @@ end
 
 local function toggleFreePay()
     if not Data or not Data.initiate then
-        importantNotify("FreePay", "Data module not available", 4)
+        importantNotify("lifePremium", "Data module not available", 4)
         return false
     end
     if not debug.getupvalue then
-        importantNotify("FreePay", "Executor does not support this feature", 4)
+        importantNotify("lifePremium", "Executor does not support this feature", 4)
         return false
     end
     if not FreePayEnabled then
@@ -428,7 +429,7 @@ local function toggleFreePay()
             end
         end)
         FreePayEnabled = true
-        importantNotify("FreePay", string.format("Activated! (%d features)", count), 4)
+        importantNotify("lifePremium", string.format("Activated! (%d features)", count), 4)
         return true
     else
         for obj, val in pairs(originals) do
@@ -446,7 +447,7 @@ local function toggleFreePay()
         end)
         table.clear(originals)
         FreePayEnabled = false
-        importantNotify("FreePay", "Disabled", 3)
+        importantNotify("lifePremium", "Disabled", 3)
         return false
     end
 end
@@ -762,7 +763,6 @@ local function toggleRainbowPhone()
         Send("phone_color", Color3.fromRGB(255,255,255))
     end
 end
-
 -- -------- Fly system (silent toggles, no speed notifications) --------
 local Flying = false
 local QEfly = true
@@ -822,7 +822,6 @@ local function startFly(isVehicleFly)
     flyBG.CFrame = targetPart.CFrame
     flyBG.Parent = targetPart
     
-    local speed = (isVehicleFly and vehicleFlySpeed or flySpeed)
     local control = flyControl
     local cam = workspace.CurrentCamera
     
@@ -851,6 +850,9 @@ local function startFly(isVehicleFly)
             end
         end
         
+        -- Read current speed every frame
+        local currentSpeed = isVehicleFly and vehicleFlySpeed or flySpeed
+        
         local moveVector = Vector3.zero
         local hasInput = false
         if control.F ~= 0 or control.B ~= 0 then
@@ -867,7 +869,7 @@ local function startFly(isVehicleFly)
         end
         
         if hasInput then
-            flyBV.Velocity = moveVector.Unit * 50 * speed
+            flyBV.Velocity = moveVector.Unit * 50 * currentSpeed
         else
             flyBV.Velocity = Vector3.zero
         end
@@ -876,18 +878,22 @@ local function startFly(isVehicleFly)
         if isVehicleFly then cam.CameraType = Enum.CameraType.Track end
     end)
     
+    -- 🔧 FIX: Use proper speed variables in key handlers
     flyKeyDown = UserInputService.InputBegan:Connect(function(input, gp)
         if gp then return end
         local key = input.KeyCode
-        if key == Enum.KeyCode.W then control.F = (isVehicleFly and vehicleFlySpeed or flySpeed) end
-        if key == Enum.KeyCode.S then control.B = -(isVehicleFly and vehicleFlySpeed or flySpeed) end
-        if key == Enum.KeyCode.A then control.L = -(isVehicleFly and vehicleFlySpeed or flySpeed) end
-        if key == Enum.KeyCode.D then control.R = (isVehicleFly and vehicleFlySpeed or flySpeed) end
+        -- Get the current speed based on fly type
+        local sp = isVehicleFly and vehicleFlySpeed or flySpeed
+        if key == Enum.KeyCode.W then control.F = sp end
+        if key == Enum.KeyCode.S then control.B = -sp end
+        if key == Enum.KeyCode.A then control.L = -sp end
+        if key == Enum.KeyCode.D then control.R = sp end
         if QEfly then
-            if key == Enum.KeyCode.E then control.Q = (isVehicleFly and vehicleFlySpeed or flySpeed)*2 end
-            if key == Enum.KeyCode.Q then control.E = -(isVehicleFly and vehicleFlySpeed or flySpeed)*2 end
+            if key == Enum.KeyCode.E then control.Q = sp * 2 end
+            if key == Enum.KeyCode.Q then control.E = -sp * 2 end
         end
     end)
+    
     flyKeyUp = UserInputService.InputEnded:Connect(function(input)
         local key = input.KeyCode
         if key == Enum.KeyCode.W then control.F = 0 end
@@ -899,11 +905,12 @@ local function startFly(isVehicleFly)
     end)
 end
 
--- Mobile fly (silent)
+-- Mobile fly (fixed similarly)
 local mobileFlyActive = false
 local mobileFlyConn = nil
 local mobileFlyBV = nil
 local mobileFlyBG = nil
+
 local function stopMobileFly()
     mobileFlyActive = false
     if mobileFlyConn then mobileFlyConn:Disconnect(); mobileFlyConn = nil end
@@ -918,8 +925,9 @@ local function startMobileFly(isVehicleFly)
     mobileFlyActive = true
     
     local targetPart = nil
+    local vehicle = nil
     if isVehicleFly then
-        local vehicle = getSeatedVehicle()
+        vehicle = getSeatedVehicle()
         if vehicle then
             targetPart = vehicle:FindFirstChild("HumanoidRootPart") or vehicle:FindFirstChild("Base") or vehicle:FindFirstChildWhichIsA("BasePart")
         end
@@ -948,7 +956,6 @@ local function startMobileFly(isVehicleFly)
     mobileFlyBG.Parent = targetPart
     
     local controlModule = require(lp.PlayerScripts:WaitForChild("PlayerModule"):WaitForChild("ControlModule"))
-    local speed = (isVehicleFly and vehicleFlySpeed or flySpeed)
     local cam = workspace.CurrentCamera
     
     mobileFlyConn = RunService.RenderStepped:Connect(function()
@@ -957,8 +964,9 @@ local function startMobileFly(isVehicleFly)
             return
         end
         local move = controlModule:GetMoveVector()
+        local currentSpeed = isVehicleFly and vehicleFlySpeed or flySpeed
         if move.Magnitude > 0 then
-            mobileFlyBV.Velocity = (cam.CFrame.LookVector * -move.Z + cam.CFrame.RightVector * move.X) * 50 * speed
+            mobileFlyBV.Velocity = (cam.CFrame.LookVector * -move.Z + cam.CFrame.RightVector * move.X) * 50 * currentSpeed
         else
             mobileFlyBV.Velocity = Vector3.zero
         end
@@ -989,18 +997,18 @@ end
 local function setFlySpeed(speed)
     speed = tonumber(speed) or 1
     flySpeed = math.clamp(speed, 0.5, 10)
-    -- No notification
+    -- No notification needed
 end
 
 local function setVehicleFlySpeed(speed)
     speed = tonumber(speed) or 1
     vehicleFlySpeed = math.clamp(speed, 0.5, 10)
-    -- No notification
+    -- No notification needed
 end
 
 local function toggleQEfly()
     QEfly = not QEfly
-    -- No notification
+    -- No notification needed
 end
 
 -- -------- Instant Avatar Copier (important notifications) --------
@@ -1187,7 +1195,6 @@ local Tabs = {
     Vehicle = Window:AddTab({ Title = "Vehicle", Icon = "car" }),
     Player = Window:AddTab({ Title = "Player", Icon = "user" }),
     Misc = Window:AddTab({ Title = "Misc", Icon = "widgets" }),
-    CopyAvatar = Window:AddTab({ Title = "Copy Avatar", Icon = "clone" }),
     Settings = Window:AddTab({ Title = "Settings", Icon = "settings" })
 }
 
@@ -1195,13 +1202,13 @@ local Tabs = {
 Tabs.Main:AddSection("Main Features")
 Tabs.Main:AddButton({
     Title = "NBA Quest",
-    Description = "Teleports to NBA props and collects them",
+    Description = "Automatically starts the NBA Quest and collect all the items.",
     Callback = startNBAQuest
 })
 
 local FreePayToggle = Tabs.Main:AddToggle("FreePayToggle", {
-    Title = "FreePay",
-    Description = "Bypass verified-only features",
+    Title = "Free LifePremium",
+    Description = "Get LifePremium for free!",
     Default = false
 })
 FreePayToggle:OnChanged(function(value)
@@ -1210,7 +1217,7 @@ end)
 
 local JobSpammerToggle = Tabs.Main:AddToggle("JobSpammerToggle", {
     Title = "Job Spammer",
-    Description = "Quickly switch between jobs",
+    Description = "Quickly changes your job",
     Default = false
 })
 JobSpammerToggle:OnChanged(function(value)
@@ -1231,7 +1238,7 @@ Tabs.Vehicle:AddSection("Vehicle Controls")
 
 local RainbowVehToggle = Tabs.Vehicle:AddToggle("RainbowVehToggle", {
     Title = "Rainbow Vehicle",
-    Description = "Cycles your owned vehicle's color",
+    Description = "Makes your vehicle rainbow.",
     Default = false
 })
 RainbowVehToggle:OnChanged(function(value)
@@ -1239,8 +1246,8 @@ RainbowVehToggle:OnChanged(function(value)
 end)
 
 local CarCookerToggle = Tabs.Vehicle:AddToggle("CarCookerToggle", {
-    Title = "Car Cooker (High Pitched)",
-    Description = "Makes your car bounce violently (any seat)",
+    Title = "Car Cooker",
+    Description = "Makes the vehicle your driving loud and high pitched asf.",
     Default = false
 })
 CarCookerToggle:OnChanged(function(value)
@@ -1249,7 +1256,7 @@ end)
 
 local AntiCarFlingToggle = Tabs.Vehicle:AddToggle("AntiCarFlingToggle", {
     Title = "Anti Car Fling",
-    Description = "Stops vehicles from flinging you",
+    Description = "Stops people & vehicles from flinging you",
     Default = false
 })
 AntiCarFlingToggle:OnChanged(function(value)
@@ -1258,7 +1265,7 @@ end)
 
 local FlyToggle = Tabs.Vehicle:AddToggle("FlyToggle", {
     Title = "Fly",
-    Description = "Fly anywhere (PC/mobile)",
+    Description = "Fly across the map.",
     Default = false
 })
 FlyToggle:OnChanged(function(value)
@@ -1267,7 +1274,7 @@ end)
 
 local VehicleFlyToggle = Tabs.Vehicle:AddToggle("VehicleFlyToggle", {
     Title = "Vehicle Fly",
-    Description = "Fly while seated in a vehicle",
+    Description = "Make your vehicle fly.",
     Default = false
 })
 VehicleFlyToggle:OnChanged(function(value)
@@ -1314,7 +1321,7 @@ NoSitToggle:OnChanged(function(value)
 end)
 
 local NoclipToggle = Tabs.Player:AddToggle("NoclipToggle", {
-    Title = "No Clip",
+    Title = "Noclip",
     Description = "Walk through walls",
     Default = false
 })
@@ -1332,8 +1339,8 @@ AntiVoidToggle:OnChanged(function(value)
 end)
 
 local AntiFlingToggle = Tabs.Player:AddToggle("AntiFlingToggle", {
-    Title = "Anti Fling (others)",
-    Description = "Makes other players non-collidable to prevent flinging",
+    Title = "Anti Fling",
+    Description = "Makes you immune to other exploiters flinging",
     Default = false
 })
 AntiFlingToggle:OnChanged(function(value)
@@ -1345,19 +1352,35 @@ Tabs.Misc:AddSection("Extra")
 
 local RainbowPhoneToggle = Tabs.Misc:AddToggle("RainbowPhoneToggle", {
     Title = "Rainbow Phone",
-    Description = "Cycles your phone's color",
+    Description = "Makes your phone rainbow (GAY).",
     Default = false
 })
+
+Tabs.Misc:AddButton({
+    Title = "Rejoin",
+    Description = "Leave and reconnect to the exact same server",
+    Callback = function()
+        local jobId = game.JobId
+        if not jobId or jobId == "" then
+            importantNotify("Rejoin", "Fuck, roblox failed somehow Gg", 3)
+            return
+        end
+        importantNotify("Rejoin", "Rejoining server", 3)
+        game:GetService("TeleportService"):TeleportToPlaceInstance(game.PlaceId, game.JobId, lp)
+    end
+})
+
 RainbowPhoneToggle:OnChanged(function(value)
     if value ~= RainbowPhoneActive then toggleRainbowPhone() end
 end)
 
 -- ----- Copy Avatar Tab -----
-Tabs.CopyAvatar:AddSection("Instant Copy")
-Tabs.CopyAvatar:AddParagraph({
+Tabs.Misc:AddSection("Instant Copy")
+Tabs.Misc:AddParagraph({
     Title = "Instructions",
     Content = "Use the dropdown below or click the button to select a player."
 })
+
 
 -- Dropdown for player list
 local playerNames = {}
@@ -1373,7 +1396,7 @@ refreshPlayerList()
 Players.PlayerAdded:Connect(refreshPlayerList)
 Players.PlayerRemoving:Connect(refreshPlayerList)
 
-local playerDropdown = Tabs.CopyAvatar:AddDropdown("PlayerDropdown", {
+local playerDropdown = Tabs.Misc:AddDropdown("PlayerDropdown", {
     Title = "Select Player",
     Values = playerNames,
     Multi = false,
@@ -1395,48 +1418,75 @@ end
 Players.PlayerAdded:Connect(updateDropdown)
 Players.PlayerRemoving:Connect(updateDropdown)
 
--- Click selection button
+-- Click selection button (improved raycast version, no extra GUI)
 local selectingTarget = false
+local selectionConnection = nil
+local chatConn = nil
+
+local function stopTargetSelection()
+    if selectionConnection then
+        selectionConnection:Disconnect()
+        selectionConnection = nil
+    end
+    if chatConn then
+        chatConn:Disconnect()
+        chatConn = nil
+    end
+    selectingTarget = false
+end
+
 local function startTargetSelection()
     if selectingTarget then
         importantNotify("Copy Avatar", "Already selecting a target", 2)
         return
     end
     selectingTarget = true
-    importantNotify("Copy Avatar", "Click on any player to copy their avatar (type 'cancel' in chat to stop)", 5)
-    
-    local mouse = lp:GetMouse()
-    local connection
-    connection = mouse.Button1Down:Connect(function()
-        local target = mouse.Target
-        if target then
-            local character = target.Parent
-            if character and character:FindFirstChildOfClass("Humanoid") then
-                local plr = Players:GetPlayerFromCharacter(character)
-                if plr then
-                    connection:Disconnect()
-                    selectingTarget = false
-                    copyPlayerAvatar(plr)
-                    return
-                end
-            end
-        end
-        importantNotify("Copy Avatar", "No player found. Click on a player's character.", 2)
-    end)
+    importantNotify("Copy Avatar", "Click/Tap on any player to copy their avatar (type 'cancel' in chat to stop)", 5)
     
     -- Cancel via chat
-    local chatConn
     chatConn = game:GetService("TextChatService").MessageReceived:Connect(function(msg)
         if msg.TextSource == lp and msg.Text:lower() == "cancel" then
-            connection:Disconnect()
-            chatConn:Disconnect()
-            selectingTarget = false
+            stopTargetSelection()
             importantNotify("Copy Avatar", "Target selection cancelled", 2)
+        end
+    end)
+    
+    -- Raycast picker (works on PC, mobile, console)
+    selectionConnection = game:GetService("UserInputService").InputBegan:Connect(function(input, gameProcessed)
+        if gameProcessed then return end
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            local screenPos = input.Position
+            if not screenPos and input.UserInputType == Enum.UserInputType.Touch then
+                local touches = game:GetService("UserInputService"):GetTouchPositions()
+                if #touches > 0 then screenPos = touches[1] end
+            end
+            if not screenPos then return end
+            
+            local camera = workspace.CurrentCamera
+            local ray = camera:ScreenPointToRay(screenPos.X, screenPos.Y)
+            local params = RaycastParams.new()
+            params.FilterType = Enum.RaycastFilterType.Blacklist
+            params.FilterDescendantsInstances = {lp.Character}
+            local result = workspace:Raycast(ray.Origin, ray.Direction * 1000, params)
+            
+            if result then
+                local model = result.Instance:FindFirstAncestorWhichIsA("Model")
+                if model and model:FindFirstChildOfClass("Humanoid") then
+                    local targetPlayer = Players:GetPlayerFromCharacter(model)
+                    if targetPlayer and targetPlayer ~= lp then
+                        stopTargetSelection()
+                        copyPlayerAvatar(targetPlayer)
+                        return
+                    end
+                end
+            end
+            -- Missed click feedback (brief notification)
+            importantNotify("Copy Avatar", "Click directly on a player's body", 1)
         end
     end)
 end
 
-Tabs.CopyAvatar:AddButton({
+Tabs.Misc:AddButton({
     Title = "Pick a Player (Click on them)",
     Description = "Click a player in the game world to instantly copy their look",
     Callback = startTargetSelection
@@ -1457,3 +1507,19 @@ SaveManager:LoadAutoloadConfig()
 
 -- Final important notification
 importantNotify("Luckey's Hub", "Loaded successfully!", 5)
+Send("bio", "Luckey's Hub User")
+
+-- ================================
+--  AUTO-RELOAD ON TELEPORT / REJOIN
+-- ================================
+
+    local queue = queue_on_teleport or (syn and syn.queue_on_teleport) or (fluxus and fluxus.queue_on_teleport) or (getgenv and getgenv().queue_on_teleport)
+    if queue then
+        queue([[
+            -- This code runs after teleport, before the new server loads fully
+            repeat task.wait() until game:IsLoaded()
+            loadstring(game:HttpGet('https://raw.githubusercontent.com/srtbryce/luckeyshub/refs/heads/main/lifetogether'))()
+        ]])
+        return true
+    end
+    return false

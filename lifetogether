@@ -1,4 +1,4 @@
---[[
+ --[[
     LUCKEY'S HUB – Fluent UI + Smart Notifications
 ]]
 
@@ -497,151 +497,262 @@ local function toggleAntiOutfit()
     end
 end
 
+
+local function avgSkin(bodyColors)
+    -- Calculate average skin tone from BodyColors (simple average of RGB)
+    if not bodyColors then return nil end
+    local r, g, b = bodyColors.HeadColor.r, bodyColors.HeadColor.g, bodyColors.HeadColor.b
+    return (r + g + b) / 3
+end
+
+local height_setter_busy = false
+
+local height_debounce_timer = nil
+local latest_height = nil
+local is_applying = false
+
+local function applyHeightChange(finalHeight)
+    if is_applying then return end
+    is_applying = true
+
+    local char = lp.Character
+    if not char then is_applying = false return end
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    if not hum then is_applying = false return end
+
+    local desc = hum:GetAppliedDescription()
+    if not desc then
+        is_applying = false
+        return
+    end
+
+    -- Capture original BodyColors
+    local bodyColors = char:FindFirstChildOfClass("BodyColors")
+    local originalSkinColors = {}
+    if bodyColors then
+        originalSkinColors = {
+            HeadColor = bodyColors.HeadColor,
+            TorsoColor = bodyColors.TorsoColor,
+            LeftArmColor = bodyColors.LeftArmColor,
+            RightArmColor = bodyColors.RightArmColor,
+            LeftLegColor = bodyColors.LeftLegColor,
+            RightLegColor = bodyColors.RightLegColor
+        }
+    end
+
+    local height = math.clamp(finalHeight, 0.4, 70)
+
+    -- Build properties
+    local properties = {
+        Head = desc.Head or 0,
+        Torso = desc.Torso or 0,
+        LeftArm = desc.LeftArm or 0,
+        RightArm = desc.RightArm or 0,
+        LeftLeg = desc.LeftLeg or 0,
+        RightLeg = desc.RightLeg or 0,
+        Face = desc.Face or 0,
+        Shirt = desc.Shirt or 0,
+        Pants = desc.Pants or 0,
+        GraphicTShirt = desc.GraphicTShirt or 0,
+        RunAnimation = desc.RunAnimation or 0,
+        WalkAnimation = desc.WalkAnimation or 0,
+        JumpAnimation = desc.JumpAnimation or 0,
+        FallAnimation = desc.FallAnimation or 0,
+        ClimbAnimation = desc.ClimbAnimation or 0,
+        IdleAnimation = desc.IdleAnimation or 0,
+        SwimAnimation = desc.SwimAnimation or 0,
+        HeightScale = height,
+        WidthScale = desc.WidthScale or 1,
+        DepthScale = desc.DepthScale or 1,
+        HeadScale = desc.HeadScale or 1,
+        BodyTypeScale = desc.BodyTypeScale or 0,
+        ProportionScale = desc.ProportionScale or 0,
+    }
+
+    local accessories = {}
+    for _, acc in ipairs(desc:GetAccessories(true)) do
+        table.insert(accessories, {
+            Rotation = "  ",
+            Position = "  ",
+            Scale = "1 1 1",
+            IsLayered = acc.IsLayered,
+            AccessoryType = acc.AccessoryType and acc.AccessoryType.Name or "",
+            AssetId = acc.AssetId,
+            Order = acc.Order,
+            Puffiness = acc.Puffiness
+        })
+    end
+
+    -- Send remote
+    pcall(function()
+        getgenv().Send("wear_outfit_from_desc", {
+            accessories = accessories,
+            properties = properties
+        })
+    end)
+
+    -- Restore skin colors after remote
+    task.delay(0.1, function()
+        local currentChar = lp.Character
+        if currentChar then
+            local bc = currentChar:FindFirstChildOfClass("BodyColors")
+            if bc and next(originalSkinColors) then
+                bc.HeadColor = originalSkinColors.HeadColor
+                bc.TorsoColor = originalSkinColors.TorsoColor
+                bc.LeftArmColor = originalSkinColors.LeftArmColor
+                bc.RightArmColor = originalSkinColors.RightArmColor
+                bc.LeftLegColor = originalSkinColors.LeftLegColor
+                bc.RightLegColor = originalSkinColors.RightLegColor
+            end
+        end
+        is_applying = false
+    end)
+end
+
+-- Debounced wrapper – call this every time the slider moves
+local height_debounce_timer = nil
+local latest_height = nil
+local notification_shown = false
+
+local NotifySons = false
+
 local function safeSetHeight(value)
     value = tonumber(value)
     if not value then return end
 
-    value = math.clamp(value, 0.4, 70)
+    latest_height = value
 
-    local char = lp.Character
-    if not char then return end
+    -- Cancel previous timer
+    if height_debounce_timer then
+        height_debounce_timer:Cancel()
+    else
+        -- Only show notification if no timer was active (first call in this debounce cycle)
+        if importantNotify and not NotifySons then
+                                NotifySons = true
 
-    local hum = char:FindFirstChildOfClass("Humanoid")
-    if not hum then return end
-
-    local ok = pcall(function()
-        local desc = hum:GetAppliedDescription()
-        if not desc then return end
-
-        -- 🔥 CREATE A FULL SNAPSHOT COPY (IMPORTANT FIX)
-        local newDesc = Instance.new("HumanoidDescription")
-
-        for _, prop in ipairs({
-            "Head","Torso","LeftArm","RightArm","LeftLeg","RightLeg",
-            "Face","Shirt","Pants","GraphicTShirt",
-            "RunAnimation","WalkAnimation","JumpAnimation","FallAnimation",
-            "ClimbAnimation","IdleAnimation","SwimAnimation",
-            "WidthScale","DepthScale","HeadScale",
-            "BodyTypeScale","ProportionScale"
-        }) do
-            newDesc[prop] = desc[prop]
+            importantNotify("Luckey's Hub", "Your height will be set in 3 seconds", 3)
         end
+    end
 
-        newDesc.HeightScale = value
+    -- Start new 3-second timer
+    height_debounce_timer = task.delay(3, function()
+        height_debounce_timer = nil
+        if latest_height then
+            applyHeightChange(latest_height)
+             NotifySons = false
 
-        local accessories = {}
-
-        pcall(function()
-            for _, acc in ipairs(desc:GetAccessories(true)) do
-                accessories[#accessories+1] = {
-                    IsLayered = acc.IsLayered,
-                    AccessoryType = acc.AccessoryType and acc.AccessoryType.Name or "",
-                    AssetId = acc.AssetId,
-                    Order = acc.Order,
-                    Puffiness = acc.Puffiness
-                }
-            end
-        end)
-
-        local sent = false
-
-        if getgenv().Send then
-            pcall(function()
-                sent = getgenv().Send("wear_outfit_from_desc", {
-                    accessories = accessories,
-                    properties = {
-                        Head = newDesc.Head,
-                        Torso = newDesc.Torso,
-                        LeftArm = newDesc.LeftArm,
-                        RightArm = newDesc.RightArm,
-                        LeftLeg = newDesc.LeftLeg,
-                        RightLeg = newDesc.RightLeg,
-                        Face = newDesc.Face,
-                        Shirt = newDesc.Shirt,
-                        Pants = newDesc.Pants,
-                        GraphicTShirt = newDesc.GraphicTShirt,
-                        RunAnimation = newDesc.RunAnimation,
-                        WalkAnimation = newDesc.WalkAnimation,
-                        JumpAnimation = newDesc.JumpAnimation,
-                        FallAnimation = newDesc.FallAnimation,
-                        ClimbAnimation = newDesc.ClimbAnimation,
-                        IdleAnimation = newDesc.IdleAnimation,
-                        SwimAnimation = newDesc.SwimAnimation,
-                        HeightScale = newDesc.HeightScale,
-                        WidthScale = newDesc.WidthScale,
-                        DepthScale = newDesc.DepthScale,
-                        HeadScale = newDesc.HeadScale,
-                        BodyTypeScale = newDesc.BodyTypeScale,
-                        ProportionScale = newDesc.ProportionScale
-                    }
-                })
-            end)
-        end
-
-        if not sent then
-            pcall(function()
-                hum:ApplyDescription(newDesc)
-            end)
+            -- Optional: show success notification here if desired
+            -- if importantNotify then
+            --     importantNotify("Luckey's Hub", "Height changed!", 2)
+            -- end
         end
     end)
-
-    if not ok then
-        warn("Height callback failed safely")
-    end
 end
+-- -------- Car Cooker (FULL FIX) --------
 
-
--- -------- Car Cooker (silent toggle) --------
 local CarCookerActive = false
 local carCookerThread = nil
+local CarCookerToggleRef = nil
 
+local carCookerNotified = false
+
+
+-- ===== Vehicle helpers =====
 local function getCurrentVehicle()
     local char = lp.Character
     if not char then return nil end
-    local humanoid = char:FindFirstChildOfClass("Humanoid")
-    if not humanoid or not humanoid.SeatPart then return nil end
-    local seat = humanoid.SeatPart
+
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    if not hum or not hum.SeatPart then return nil end
+
+    local seat = hum.SeatPart
     if not seat or not seat.Parent then return nil end
+
     local vehicle = seat.Parent
     while vehicle and vehicle ~= workspace do
-        if vehicle:IsA("Model") and (vehicle.PrimaryPart or vehicle:FindFirstChildWhichIsA("VehicleSeat") or vehicle:FindFirstChild("HumanoidRootPart")) then
+        if vehicle:IsA("Model") then
             return vehicle
         end
         vehicle = vehicle.Parent
     end
+
     return nil
 end
 
+
 local function getVehicleRootPart(vehicle)
     if not vehicle then return nil end
-    return vehicle:FindFirstChild("HumanoidRootPart") 
-        or vehicle:FindFirstChild("Base") 
+    return vehicle:FindFirstChild("HumanoidRootPart")
+        or vehicle:FindFirstChild("Base")
         or vehicle:FindFirstChildWhichIsA("BasePart")
         or vehicle.PrimaryPart
 end
 
+
+-- ===== Seat detector (IMPORTANT FIX) =====
+local function bindVehicleSeatDetector(onEnter, onExit)
+    local function setup(char)
+        local hum = char:WaitForChild("Humanoid")
+
+        local wasInVehicle = false
+
+        hum:GetPropertyChangedSignal("SeatPart"):Connect(function()
+            local seat = hum.SeatPart
+            local inVehicle = seat and seat:IsA("VehicleSeat")
+
+            if inVehicle and not wasInVehicle then
+                wasInVehicle = true
+                if onEnter then onEnter(seat) end
+
+            elseif not inVehicle and wasInVehicle then
+                wasInVehicle = false
+                if onExit then onExit() end
+            end
+        end)
+    end
+
+    if lp.Character then
+        setup(lp.Character)
+    end
+
+    lp.CharacterAdded:Connect(setup)
+end
+
+
+-- ===== Start Car Cooker =====
 local function startCarCooker()
     if carCookerThread then return end
+
     carCookerThread = task.spawn(function()
         repeat
             RunService.Heartbeat:Wait()
+            if not CarCookerActive then return end
+
+            local char = lp.Character
+            local hum = char and char:FindFirstChildOfClass("Humanoid")
+            local seat = hum and hum.SeatPart
+
+            if not (seat and seat:IsA("VehicleSeat")) then
+                continue
+            end
+
             local vehicle = getCurrentVehicle()
             local root = vehicle and getVehicleRootPart(vehicle)
-            while not (vehicle and root and root.Parent) do
-                RunService.Heartbeat:Wait()
-                vehicle = getCurrentVehicle()
-                root = vehicle and getVehicleRootPart(vehicle)
-            end
+
+
             local vel = root.Velocity
             local movel = 0.1
             root.Velocity = vel * 10000 + Vector3.new(0, 10000, 0)
             RunService.RenderStepped:Wait()
-            if CarCookerActive and vehicle and vehicle.Parent and root and root.Parent then root.Velocity = vel end
+            if CarCookerActive and vehicle and vehicle.Parent and root and root.Parent then
+                root.Velocity = vel
+            end
             RunService.Stepped:Wait()
             if CarCookerActive and vehicle and vehicle.Parent and root and root.Parent then
                 root.Velocity = vel + Vector3.new(0, movel, 0)
                 movel = movel * -1
             end
+            
         until CarCookerActive == false
     end)
 end
@@ -661,9 +772,34 @@ local function toggleCarCooker()
         CarCookerActive = true
         startCarCooker()
     else
+                CarCookerActive = false
+
         stopCarCooker()
     end
 end
+
+bindVehicleSeatDetector(
+    function()
+        -- entered vehicle
+        carCookerNotified = false
+    end,
+
+    function()
+        -- exited vehicle (instant + reliable)
+        if CarCookerActive then
+            CarCookerActive = false
+
+            if not carCookerNotified then
+                carCookerNotified = true
+                importantNotify("Car Cooker", "Disabled due to leaving the vehicle!", 5)
+            end
+
+            if CarCookerToggleRef then
+                CarCookerToggleRef:SetValue(false)
+            end
+        end
+    end
+)
 
 -- -------- Other toggles (silent) --------
 local NoSitActive = false
@@ -723,7 +859,7 @@ local function toggleAntiVoid()
             local hrp = lp.Character and lp.Character:FindFirstChild("HumanoidRootPart")
             if hrp and hrp.Position.Y < 0 then
                 hrp.CFrame = CFrame.new(0,50,0)
-                importantNotify("AntiVoid", "Saved you from falling!", 3)
+               -- importantNotify("Sonion", "u was bouta fall", 3)
             end
         end)
     else
@@ -1160,13 +1296,28 @@ local function copyPlayerAvatar(targetPlayer)
         return false
     end
     
+    -- 1. Get target's BodyColors (skin colors)
+    local targetBodyColors = targetChar:FindFirstChildOfClass("BodyColors")
+    local targetSkinColors = {}
+    if targetBodyColors then
+        targetSkinColors = {
+            HeadColor = targetBodyColors.HeadColor,
+            TorsoColor = targetBodyColors.TorsoColor,
+            LeftArmColor = targetBodyColors.LeftArmColor,
+            RightArmColor = targetBodyColors.RightArmColor,
+            LeftLegColor = targetBodyColors.LeftLegColor,
+            RightLegColor = targetBodyColors.RightLegColor
+        }
+    end
+    
+    -- 2. Get target's HumanoidDescription (for assets & scales)
     local desc = targetHum:GetAppliedDescription()
     if not desc then
         importantNotify("Copy Avatar", "Failed to get description from " .. targetPlayer.Name, 2)
         return false
     end
     
-    -- Build properties table (same format as height setter expects)
+    -- Build properties table (same as before)
     local properties = {
         Head = desc.Head or 0,
         Torso = desc.Torso or 0,
@@ -1210,24 +1361,43 @@ local function copyPlayerAvatar(targetPlayer)
         properties = properties
     }
     
-    -- Try to send via the game's remote (same as height setter uses)
+    -- 3. Send the remote to apply clothes, accessories, scales
     local success, err = Send("wear_outfit_from_desc", payload)
-    if success then
-        importantNotify("Copy Avatar", "Successfully copied " .. targetPlayer.Name .. "'s outfit!", 3)
-        return true
-    else
-        -- Fallback: try alternative remote name (common in some games)
+    if not success then
+        -- fallback
         local success2, err2 = Send("CopyOutfit", targetPlayer)
-        if success2 then
-            importantNotify("Copy Avatar", "Copied " .. targetPlayer.Name .. " via fallback method", 3)
-            return true
-        else
+        if not success2 then
             importantNotify("Copy Avatar", "Failed to copy: " .. (err or err2 or "unknown error"), 4)
             return false
         end
     end
-end
+    
+    -- 4. Restore target's skin colors AFTER remote (overwrites the default black)
+    task.delay(0.1, function()
+        local localChar = game.Players.LocalPlayer.Character
+        if localChar then
+            local bc = localChar:FindFirstChildOfClass("BodyColors")
+            if bc and next(targetSkinColors) then
+                bc.HeadColor = targetSkinColors.HeadColor
+                bc.TorsoColor = targetSkinColors.TorsoColor
+                bc.LeftArmColor = targetSkinColors.LeftArmColor
+                bc.RightArmColor = targetSkinColors.RightArmColor
+                bc.LeftLegColor = targetSkinColors.LeftLegColor
+                bc.RightLegColor = targetSkinColors.RightLegColor
+            end
+        end
+    end)
 
+       
+    local bodyColors = targetPlayer.Character:FindFirstChildOfClass("BodyColors")
+    if bodyColors then
+        pcall(Send, "skin_tone", avgSkin(bodyColors))
+    end
+    
+    
+    importantNotify("Copy Avatar", "Successfully copied " .. targetPlayer.Name .. "'s outfit + skin!", 3)
+    return true
+end
 -- ================================
 --  FLUENT UI CONSTRUCTION
 -- ================================
@@ -1302,9 +1472,12 @@ local CarCookerToggle = Tabs.Vehicle:AddToggle("CarCookerToggle", {
     Description = "Makes the vehicle your driving loud and high pitched asf.",
     Default = false
 })
+CarCookerToggleRef = CarCookerToggle  -- store reference
+
 CarCookerToggle:OnChanged(function(value)
     if value ~= CarCookerActive then toggleCarCooker() end
 end)
+
 
 local AntiCarFlingToggle = Tabs.Vehicle:AddToggle("AntiCarFlingToggle", {
     Title = "Anti Car Fling",
@@ -1382,11 +1555,175 @@ local VehicleFlySpeedSlider = Tabs.Vehicle:AddSlider("VehicleFlySpeedSlider", {
     Callback = setVehicleFlySpeed  -- silent
 })
 
+
+--- ========== WALKSPEED & JUMPPOWER ==========
+local function setWalkSpeed(speed)
+    speed = tonumber(speed)
+    if not speed then return end
+    local hum = lp.Character and lp.Character:FindFirstChildOfClass("Humanoid")
+    if hum then
+        hum.WalkSpeed = math.clamp(speed, 0, 750)
+    end
+end
+
+local function setJumpPower(power)
+    power = tonumber(power)
+    if not power then return end
+    local hum = lp.Character and lp.Character:FindFirstChildOfClass("Humanoid")
+    if hum then
+        hum.JumpPower = math.clamp(power, 0, 500)
+        hum.UseJumpPower = true
+    end
+end
+
+-- ========== WALKFLING (with auto‑disable when seated) ==========
+local walkflinging = false
+local flingConnection = nil
+local deathConnection = nil
+local seatConnection = nil
+local walkFlingToggleRef = nil  -- will store the toggle object
+
+local function getRoot(char)
+    return char and char:FindFirstChild("HumanoidRootPart")
+end
+
+local function stopWalkFling()
+    if not walkflinging then return end
+    walkflinging = false
+
+    if flingConnection then
+        flingConnection:Disconnect()
+        flingConnection = nil
+    end
+    if deathConnection then
+        deathConnection:Disconnect()
+        deathConnection = nil
+    end
+    if seatConnection then
+        seatConnection:Disconnect()
+        seatConnection = nil
+    end
+
+    -- Disable noclip if you have it
+    if noclipActive then
+        pcall(toggleNoclip, true)
+    end
+
+    local root = getRoot(lp.Character)
+    if root then
+        root.Velocity = Vector3.new(0,0,0)
+    end
+end
+
+local function startWalkFling()
+    if walkflinging then return end
+    walkflinging = true
+
+    -- Enable noclip
+    if toggleNoclip then
+        pcall(toggleNoclip, true)
+    end
+
+    local character = lp.Character
+    if not character then return end
+
+    local humanoid = character:FindFirstChildWhichIsA("Humanoid")
+    if humanoid then
+        if deathConnection then deathConnection:Disconnect() end
+        deathConnection = humanoid.Died:Connect(stopWalkFling)
+
+        -- Monitor seating state
+        local function checkSeat()
+            if not walkflinging then return end
+            if humanoid.SeatPart then
+                -- Auto‑disable fling when sitting
+                if walkFlingToggleRef then
+                    walkFlingToggleRef:SetValue(false)  -- update UI toggle
+                end
+                stopWalkFling()
+            end
+        end
+        if seatConnection then seatConnection:Disconnect() end
+        seatConnection = humanoid:GetPropertyChangedSignal("SeatPart"):Connect(checkSeat)
+        checkSeat() -- immediate check in case already seated
+    end
+
+    flingConnection = game:GetService("RunService").Heartbeat:Connect(function()
+        if not walkflinging then
+            if flingConnection then flingConnection:Disconnect() end
+            return
+        end
+        local character = lp.Character
+        local root = getRoot(character)
+        if not (character and character.Parent and root and root.Parent) then return end
+
+        local vel = root.Velocity
+        local movel = 0.1
+
+        root.Velocity = vel * 10000 + Vector3.new(0, 10000, 0)
+
+        game:GetService("RunService").RenderStepped:Wait()
+        if character and character.Parent and root and root.Parent then
+            root.Velocity = vel
+        end
+
+        game:GetService("RunService").Stepped:Wait()
+        if character and character.Parent and root and root.Parent then
+            root.Velocity = vel + Vector3.new(0, movel, 0)
+            movel = movel * -1
+        end
+    end)
+end
+
+local function toggleWalkFling()
+    if walkflinging then
+        stopWalkFling()
+    else
+        startWalkFling()
+    end
+end
+
+-- ========== ADD TO FLUENT UI ==========
+Tabs.Player:AddSlider("WalkSpeedSlider", {
+    Title = "Walk Speed",
+    Description = "Change your movement speed",
+    Min = 0,
+    Max = 750,
+    Default = 16,
+    Rounding = 1,
+    Callback = setWalkSpeed
+})
+
+Tabs.Player:AddSlider("JumpPowerSlider", {
+    Title = "Jump Power",
+    Description = "Change your jump height",
+    Min = 0,
+    Max = 500,
+    Default = 50,
+    Rounding = 1,
+    Callback = setJumpPower
+})
+
+local WalkFlingToggle = Tabs.Player:AddToggle("WalkFlingToggle", {
+    Title = "Fling",
+    Description = "Fling other players in your server",
+    Default = false
+})
+walkFlingToggleRef = WalkFlingToggle  -- store reference for auto-disable
+
+WalkFlingToggle:OnChanged(function(value)
+    if value then
+        toggleWalkFling()
+    else
+        toggleWalkFling()
+    end
+end)
+
 -- ----- Player Tab -----
 Tabs.Player:AddSection("Player Modifiers")
 
 local NoSitToggle = Tabs.Player:AddToggle("NoSitToggle", {
-    Title = "No Sit",
+    Title = "Anti Sit",
     Description = "Prevents your character from sitting",
     Default = false
 })
@@ -1444,13 +1781,21 @@ Tabs.Misc:AddButton({
     end
 })
 
+Tabs.Misc:AddButton({
+    Title = "Gaze Emotes",
+    Description = "Loads Gaze Emotes (External)",
+    Callback = function()
+loadstring(game:HttpGet("https://raw.githubusercontent.com/Gazer-Ha/Gaze-stuff/refs/heads/main/Gaze%20emote"))()
+    end
+})
+
 RainbowPhoneToggle:OnChanged(function(value)
     if value ~= RainbowPhoneActive then toggleRainbowPhone() end
 end)
 
 -- ----- Copy Avatar Tab -----
-Tabs.Misc:AddSection("Avatar Copier")
-Tabs.Misc:AddParagraph({
+Tabs.Player:AddSection("Avatar Copier")
+Tabs.Player:AddParagraph({
     Title = "Instructions",
     Content = "Use the dropdown below or click the button to select a player."
 })
@@ -1470,7 +1815,7 @@ refreshPlayerList()
 Players.PlayerAdded:Connect(refreshPlayerList)
 Players.PlayerRemoving:Connect(refreshPlayerList)
 
-local playerDropdown = Tabs.Misc:AddDropdown("PlayerDropdown", {
+local playerDropdown = Tabs.Player:AddDropdown("PlayerDropdown", {
     Title = "Select Player",
     Values = playerNames,
     Multi = false,
@@ -1560,7 +1905,7 @@ local function startTargetSelection()
     end)
 end
 
-Tabs.Misc:AddButton({
+Tabs.Player:AddButton({
     Title = "Pick a Player (Click on them)",
     Description = "Click a player in the game world to instantly copy their look",
     Callback = startTargetSelection
@@ -1634,7 +1979,7 @@ ScreenGui.Parent = game.Players.LocalPlayer:WaitForChild("PlayerGui")
 -- Button
 local Button = Instance.new("ImageButton")
 Button.Size = UDim2.fromOffset(60, 60)
-Button.Position = UDim2.new(0.5, 0, 0.5, 0)
+Button.Position = UDim2.new(0.5, 724, 0.5, 30)
 Button.AnchorPoint = Vector2.new(0.5, 0.5)
 Button.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
 Button.AutoButtonColor = false
@@ -1677,9 +2022,85 @@ Button.MouseLeave:Connect(function()
 	TweenService:Create(Button, tweenInfo, {Size = normalSize}):Play()
 end)
 
+local KeyToVK = {
+
+    -- Letters
+    A = 0x41, B = 0x42, C = 0x43, D = 0x44, E = 0x45,
+    F = 0x46, G = 0x47, H = 0x48, I = 0x49, J = 0x4A,
+    K = 0x4B, L = 0x4C, M = 0x4D, N = 0x4E, O = 0x4F,
+    P = 0x50, Q = 0x51, R = 0x52, S = 0x53, T = 0x54,
+    U = 0x55, V = 0x56, W = 0x57, X = 0x58, Y = 0x59,
+    Z = 0x5A,
+
+    -- Numbers (top row)
+    One = 0x31, Two = 0x32, Three = 0x33, Four = 0x34,
+    Five = 0x35, Six = 0x36, Seven = 0x37, Eight = 0x38,
+    Nine = 0x39, Zero = 0x30,
+
+    -- Function keys
+    F1 = 0x70, F2 = 0x71, F3 = 0x72, F4 = 0x73,
+    F5 = 0x74, F6 = 0x75, F7 = 0x76, F8 = 0x77,
+    F9 = 0x78, F10 = 0x79, F11 = 0x7A, F12 = 0x7B,
+
+    -- Control keys
+    Escape = 0x1B,
+    Tab = 0x09,
+    CapsLock = 0x14,
+    Space = 0x20,
+    Enter = 0x0D,
+    Backspace = 0x08,
+
+    -- Modifiers
+    LeftShift = 0xA0,
+    RightShift = 0xA1,
+    LeftControl = 0xA2,
+    RightControl = 0xA3,
+    LeftAlt = 0xA4,
+    RightAlt = 0xA5,
+
+    -- Arrow keys
+    Left = 0x25,
+    Up = 0x26,
+    Right = 0x27,
+    Down = 0x28,
+
+    -- Navigation
+    Insert = 0x2D,
+    Delete = 0x2E,
+    Home = 0x24,
+    End = 0x23,
+    PageUp = 0x21,
+    PageDown = 0x22,
+
+    -- Symbols (common ones)
+    Minus = 0xBD,
+    Equals = 0xBB,
+    LeftBracket = 0xDB,
+    RightBracket = 0xDD,
+    BackSlash = 0xDC,
+    Semicolon = 0xBA,
+    Apostrophe = 0xDE,
+    Comma = 0xBC,
+    Period = 0xBE,
+    Slash = 0xBF,
+
+    -- Mouse buttons (if supported by your keyclick system)
+    Mouse1 = 0x01,
+    Mouse2 = 0x02,
+    Mouse3 = 0x04,
+}
+
 -- Click
 Button.Activated:Connect(function()
-    	keyclick(0xA2)
+ 
+local KeyRaw = InterfaceManager.Library.MinimizeKeybind.Value
+local KeyCode = KeyToVK[KeyRaw]
+
+if KeyCode then
+    keyclick(KeyCode)
+else
+    warn("Missing VK mapping for:", KeyRaw)
+end
 
 	local shrink = TweenService:Create(Button, tweenInfo, {Size = clickSize})
 	local expand = TweenService:Create(Button, tweenInfo, {Size = hoverSize})

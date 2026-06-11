@@ -1047,47 +1047,32 @@ local function avgSkin(bodyColors)
     end
     return Color3.new(r/6, g/6, b/6)
 end
+
 local function copyPlayerAvatar(targetPlayer)
-    if copyingAvatar then
-        importantNotify("Copy Avatar", "Already copying an avatar!", 3)
-        return
-    end
-    if not targetPlayer or not targetPlayer.Character then
-        importantNotify("Copy Avatar", "Target not found or no character", 3)
-        return
+    if not targetPlayer then
+        importantNotify("Copy Avatar", "No target player selected", 2)
+        return false
     end
     
-    copyingAvatar = true
-    importantNotify("Copy Avatar", "Copying avatar from " .. targetPlayer.Name .. "...", 3)
-    
-    local hum = targetPlayer.Character:FindFirstChildOfClass("Humanoid")
-    if not hum then
-        importantNotify("Copy Avatar", "Target has no humanoid", 3)
-        copyingAvatar = false
-        return
+    local targetChar = targetPlayer.Character
+    if not targetChar or not targetChar.Parent then
+        importantNotify("Copy Avatar", targetPlayer.Name .. " has no valid character", 2)
+        return false
     end
     
-    local desc = hum:GetAppliedDescription()
+    local targetHum = targetChar:FindFirstChildOfClass("Humanoid")
+    if not targetHum then
+        importantNotify("Copy Avatar", "Humanoid not found on " .. targetPlayer.Name, 2)
+        return false
+    end
+    
+    local desc = targetHum:GetAppliedDescription()
     if not desc then
-        importantNotify("Copy Avatar", "Failed to get description", 3)
-        copyingAvatar = false
-        return
+        importantNotify("Copy Avatar", "Failed to get description from " .. targetPlayer.Name, 2)
+        return false
     end
     
-    clearAvatar()
-    task.wait(0.2)
-    
-    local accessories = {}
-    for _, acc in ipairs(desc:GetAccessories(true)) do
-        table.insert(accessories, {
-            IsLayered = acc.IsLayered,
-            AccessoryType = acc.AccessoryType.Name,
-            AssetId = acc.AssetId,
-            Order = acc.Order,
-            Puffiness = acc.Puffiness
-        })
-    end
-    
+    -- Build properties table (same format as height setter expects)
     local properties = {
         Head = desc.Head or 0,
         Torso = desc.Torso or 0,
@@ -1114,69 +1099,39 @@ local function copyPlayerAvatar(targetPlayer)
         ProportionScale = desc.ProportionScale or 0,
     }
     
-    pcall(Send, "wear_outfit_from_desc", {accessories = accessories, properties = properties})
-    task.wait(0.15)
-
-               local height = math.clamp(math.floor((desc.HeightScale or 1)*100+0.5),90,105)
-   local width  = math.clamp(math.floor((desc.WidthScale  or 1)*100+0.5),70,100)
-        pcall(Send, "body_scale","HeightScale",height)
-   task.wait(0.15)
-        pcall(Send, "body_scale", "WidthScale", width)
-
-    
-    local bodyColors = targetPlayer.Character:FindFirstChildOfClass("BodyColors")
-    if bodyColors then
-        pcall(Send, "skin_tone", avgSkin(bodyColors))
+    -- Build accessories table
+    local accessories = {}
+    for _, acc in ipairs(desc:GetAccessories(true)) do
+        table.insert(accessories, {
+            IsLayered = acc.IsLayered,
+            AccessoryType = acc.AccessoryType.Name,
+            AssetId = acc.AssetId,
+            Order = acc.Order,
+            Puffiness = acc.Puffiness
+        })
     end
     
-    -- Store target height & width (raw scales, not clamped)
-    local targetHeight = desc.HeightScale or 1
-    local targetWidth = desc.WidthScale or 1
+    local payload = {
+        accessories = accessories,
+        properties = properties
+    }
     
-    -- Helper to apply scales (game uses 90‑105 for height, 70‑100 for width)
-    local function forceScales()
-           local height = math.clamp(math.floor((desc.HeightScale or 1)*100+0.5),90,105)
-   local width  = math.clamp(math.floor((desc.WidthScale  or 1)*100+0.5),70,100)
-        pcall(Send, "body_scale","HeightScale",height)
-   task.wait(0.15)
-        pcall(Send, "body_scale", "WidthScale", width)
-
-
-    end
-    
-    -- Apply immediately
-    forceScales()
-    
-    -- Keep reapplying for 5 seconds (combats game auto‑reset)
-    local endTime = tick() + 5
-    task.spawn(function()
-        while tick() < endTime and copyingAvatar do
-            task.wait(0.5)
-            forceScales()
-
-                       local height = math.clamp(math.floor((desc.HeightScale or 1)*100+0.5),90,105)
-   local width  = math.clamp(math.floor((desc.WidthScale  or 1)*100+0.5),70,100)
-        pcall(Send, "body_scale","HeightScale",height)
-   task.wait(0.15)
-        pcall(Send, "body_scale", "WidthScale", width)
-
+    -- Try to send via the game's remote (same as height setter uses)
+    local success, err = Send("wear_outfit_from_desc", payload)
+    if success then
+        importantNotify("Copy Avatar", "Successfully copied " .. targetPlayer.Name .. "'s outfit!", 3)
+        return true
+    else
+        -- Fallback: try alternative remote name (common in some games)
+        local success2, err2 = Send("CopyOutfit", targetPlayer)
+        if success2 then
+            importantNotify("Copy Avatar", "Copied " .. targetPlayer.Name .. " via fallback method", 3)
+            return true
+        else
+            importantNotify("Copy Avatar", "Failed to copy: " .. (err or err2 or "unknown error"), 4)
+            return false
         end
-    end)
-    
-    local age = targetPlayer:GetAttribute("age")
-    if age then
-        pcall(Get, "age", age)
     end
-    
-               local height = math.clamp(math.floor((desc.HeightScale or 1)*100+0.5),90,105)
-   local width  = math.clamp(math.floor((desc.WidthScale  or 1)*100+0.5),70,100)
-        pcall(Send, "body_scale","HeightScale",height)
-   task.wait(0.15)
-        pcall(Send, "body_scale", "WidthScale", width)
-
-        
-    importantNotify("Copy Avatar", "Successfully copied avatar from " .. targetPlayer.Name, 4)
-    copyingAvatar = false
 end
 
 -- ================================
@@ -1322,6 +1277,124 @@ local NoSitToggle = Tabs.Player:AddToggle("NoSitToggle", {
 NoSitToggle:OnChanged(function(value)
     if value ~= NoSitActive then toggleNoSit() end
 end)
+
+-- Get current height from your character (default to 1 if not available)
+local function getCurrentHeight()
+    local char = lp.Character
+    if not char then return 1 end
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    if not hum then return 1 end
+    local desc = hum:GetAppliedDescription()
+    return desc and desc.HeightScale or 1
+end
+
+--[==[
+    setPlayerHeight(newHeight)
+    - newHeight : number (0.4 to 3.0, default range)
+    - Returns true on success, false + notification on failure
+]==]
+
+local function setPlayerHeight(newHeight)
+    -- Clamp to reasonable values
+    newHeight = math.clamp(newHeight, 0.4, 3.0)
+    
+    local lp = game.Players.LocalPlayer
+    local char = lp.Character
+    if not char or not char.Parent then
+        return false
+    end
+    
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    if not hum then
+        return false
+    end
+    
+    -- Get current HumanoidDescription
+    local desc = hum:GetAppliedDescription()
+    if not desc then
+        return false
+    end
+    
+    -- Build payload (same format as the game expects)
+    local properties = {
+        Head = desc.Head or 0,
+        Torso = desc.Torso or 0,
+        LeftArm = desc.LeftArm or 0,
+        RightArm = desc.RightArm or 0,
+        LeftLeg = desc.LeftLeg or 0,
+        RightLeg = desc.RightLeg or 0,
+        Face = desc.Face or 0,
+        Shirt = desc.Shirt or 0,
+        Pants = desc.Pants or 0,
+        GraphicTShirt = desc.GraphicTShirt or 0,
+        RunAnimation = desc.RunAnimation or 0,
+        WalkAnimation = desc.WalkAnimation or 0,
+        JumpAnimation = desc.JumpAnimation or 0,
+        FallAnimation = desc.FallAnimation or 0,
+        ClimbAnimation = desc.ClimbAnimation or 0,
+        IdleAnimation = desc.IdleAnimation or 0,
+        SwimAnimation = desc.SwimAnimation or 0,
+        HeightScale = newHeight,
+        WidthScale = desc.WidthScale or 1,
+        DepthScale = desc.DepthScale or 1,
+        HeadScale = desc.HeadScale or 1,
+        BodyTypeScale = desc.BodyTypeScale or 0,
+        ProportionScale = desc.ProportionScale or 0,
+    }
+    
+    local accessories = {}
+    for _, acc in ipairs(desc:GetAccessories(true)) do
+        table.insert(accessories, {
+            IsLayered = acc.IsLayered,
+            AccessoryType = acc.AccessoryType.Name,
+            AssetId = acc.AssetId,
+            Order = acc.Order,
+            Puffiness = acc.Puffiness
+        })
+    end
+    
+    local payload = {
+        accessories = accessories,
+        properties = properties
+    }
+    
+    -- Try to send via the game's remote (assumes "Net" module is loaded)
+    local success = false
+    if getgenv().Send then
+        success = getgenv().Send("wear_outfit_from_desc", payload)
+    end
+    
+    -- Fallback: apply description locally (visible only to you)
+    if not success then
+        pcall(function()
+            local newDesc = Instance.new("HumanoidDescription")
+            for k, v in pairs(properties) do
+                if newDesc[k] ~= nil then
+                    newDesc[k] = v
+                end
+            end
+            hum:ApplyDescription(newDesc)
+        end)
+        return true
+    end
+    
+    return success
+end
+
+-- Create the slider
+local HeightSlider = Tabs.Player:AddSlider("HeightSlider", {
+    Title = "Player Height",
+    Description = "Change your height above and beyond...",
+    Min = 0.4,
+    Max = 3.0,
+    Default = getCurrentHeight(),   -- 🔥 sets to your ACTUAL current height
+    Rounding = 2,
+    Callback = function(value)
+        setPlayerHeight(value)
+        -- Optional: small visual feedback (no notification spam)
+    end
+})
+
 
 local NoclipToggle = Tabs.Player:AddToggle("NoclipToggle", {
     Title = "Noclip",

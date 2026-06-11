@@ -509,31 +509,22 @@ local function safeSetHeight(value)
     local hum = char:FindFirstChildOfClass("Humanoid")
     if not hum then return end
 
-    local ok = pcall(function()
-        local desc = hum:GetAppliedDescription()
-        if not desc then return end
+    pcall(function()
+        local currentDesc = hum:GetAppliedDescription()
+        if not currentDesc then return end
 
-        -- 🔥 CREATE A FULL SNAPSHOT COPY (IMPORTANT FIX)
-        local newDesc = Instance.new("HumanoidDescription")
-
-        for _, prop in ipairs({
-            "Head","Torso","LeftArm","RightArm","LeftLeg","RightLeg",
-            "Face","Shirt","Pants","GraphicTShirt",
-            "RunAnimation","WalkAnimation","JumpAnimation","FallAnimation",
-            "ClimbAnimation","IdleAnimation","SwimAnimation",
-            "WidthScale","DepthScale","HeadScale",
-            "BodyTypeScale","ProportionScale"
-        }) do
-            newDesc[prop] = desc[prop]
-        end
-
+        -- ✅ Clone the ENTIRE current description (fixes black avatar & missing skin color)
+        local newDesc = currentDesc:Clone()
         newDesc.HeightScale = value
 
-        local accessories = {}
+        -- ✅ Always apply locally to guarantee visual update
+        hum:ApplyDescription(newDesc)
 
-        pcall(function()
-            for _, acc in ipairs(desc:GetAccessories(true)) do
-                accessories[#accessories+1] = {
+        -- Optional: Sync with external system (if Send exists)
+        if getgenv().Send then
+            local accessories = {}
+            for _, acc in ipairs(currentDesc:GetAccessories(true)) do
+                accessories[#accessories + 1] = {
                     IsLayered = acc.IsLayered,
                     AccessoryType = acc.AccessoryType and acc.AccessoryType.Name or "",
                     AssetId = acc.AssetId,
@@ -541,13 +532,9 @@ local function safeSetHeight(value)
                     Puffiness = acc.Puffiness
                 }
             end
-        end)
 
-        local sent = false
-
-        if getgenv().Send then
             pcall(function()
-                sent = getgenv().Send("wear_outfit_from_desc", {
+                getgenv().Send("wear_outfit_from_desc", {
                     accessories = accessories,
                     properties = {
                         Head = newDesc.Head,
@@ -577,17 +564,7 @@ local function safeSetHeight(value)
                 })
             end)
         end
-
-        if not sent then
-            pcall(function()
-                hum:ApplyDescription(newDesc)
-            end)
-        end
     end)
-
-    if not ok then
-        warn("Height callback failed safely")
-    end
 end
 
 

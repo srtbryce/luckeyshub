@@ -497,6 +497,86 @@ local function toggleAntiOutfit()
     end
 end
 
+local function safeSetHeight(value)
+    value = tonumber(value)
+    if not value then return end
+
+    value = math.clamp(value, 0.4, 70)
+
+    local char = lp.Character
+    if not char then return end
+
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    if not hum then return end
+
+    -- isolate EVERYTHING risky
+    local ok = pcall(function()
+        local desc = hum:GetAppliedDescription()
+        if not desc then return end
+
+        desc.HeightScale = value
+
+        local accessories = {}
+        pcall(function()
+            for _, acc in ipairs(desc:GetAccessories(true)) do
+                accessories[#accessories+1] = {
+                    IsLayered = acc.IsLayered,
+                    AccessoryType = acc.AccessoryType and acc.AccessoryType.Name or "",
+                    AssetId = acc.AssetId,
+                    Order = acc.Order,
+                    Puffiness = acc.Puffiness
+                }
+            end
+        end)
+
+        local sent = false
+        if getgenv().Send then
+            pcall(function()
+                sent = getgenv().Send("wear_outfit_from_desc", {
+                    accessories = accessories,
+                    properties = {
+                        Head = desc.Head,
+                        Torso = desc.Torso,
+                        LeftArm = desc.LeftArm,
+                        RightArm = desc.RightArm,
+                        LeftLeg = desc.LeftLeg,
+                        RightLeg = desc.RightLeg,
+                        Face = desc.Face,
+                        Shirt = desc.Shirt,
+                        Pants = desc.Pants,
+                        GraphicTShirt = desc.GraphicTShirt,
+                        RunAnimation = desc.RunAnimation,
+                        WalkAnimation = desc.WalkAnimation,
+                        JumpAnimation = desc.JumpAnimation,
+                        FallAnimation = desc.FallAnimation,
+                        ClimbAnimation = desc.ClimbAnimation,
+                        IdleAnimation = desc.IdleAnimation,
+                        SwimAnimation = desc.SwimAnimation,
+                        HeightScale = value,
+                        WidthScale = desc.WidthScale,
+                        DepthScale = desc.DepthScale,
+                        HeadScale = desc.HeadScale,
+                        BodyTypeScale = desc.BodyTypeScale,
+                        ProportionScale = desc.ProportionScale
+                    }
+                })
+            end)
+        end
+
+        if not sent then
+            pcall(function()
+                hum:ApplyDescription(desc)
+            end)
+        end
+    end)
+
+    -- debug so you KNOW if callback is silently failing
+    if not ok then
+        warn("Height callback failed safely (no crash)")
+    end
+end
+
+
 -- -------- Car Cooker (silent toggle) --------
 local CarCookerActive = false
 local carCookerThread = nil
@@ -1142,7 +1222,7 @@ local Window = Fluent:CreateWindow({
     SubTitle = "LifeTogether 🏠 RP",
     TabWidth = 160,
     Size = UDim2.fromOffset(580, 460),
-    Acrylic = true,
+    Acrylic = false,
     Theme = "Dark",
     MinimizeKey = Enum.KeyCode.LeftControl
 })
@@ -1257,6 +1337,28 @@ local FlySpeedSlider = Tabs.Player:AddSlider("FlySpeedSlider", {
     Callback = setFlySpeed  -- silent
 })
 
+local Players = game:GetService("Players")
+local lp = Players.LocalPlayer
+
+local Players = game:GetService("Players")
+local lp = Players.LocalPlayer
+
+local HeightSlider = Tabs.Player:AddSlider("HeightSlider", {
+    Title = "Player Height",
+    Description = "Change your height above and beyond...",
+    Min = 0.4,
+    Max = 70,
+    Default = 1,
+    Rounding = 2,
+
+    Callback = function(value)
+        task.defer(function()
+            safeSetHeight(value)
+        end)
+    end
+})
+
+
 local VehicleFlySpeedSlider = Tabs.Vehicle:AddSlider("VehicleFlySpeedSlider", {
     Title = "Vehicle Fly Speed",
     Min = 0.5,
@@ -1277,124 +1379,6 @@ local NoSitToggle = Tabs.Player:AddToggle("NoSitToggle", {
 NoSitToggle:OnChanged(function(value)
     if value ~= NoSitActive then toggleNoSit() end
 end)
-
--- Get current height from your character (default to 1 if not available)
-local function getCurrentHeight()
-    local char = lp.Character
-    if not char then return 1 end
-    local hum = char:FindFirstChildOfClass("Humanoid")
-    if not hum then return 1 end
-    local desc = hum:GetAppliedDescription()
-    return desc and desc.HeightScale or 1
-end
-
---[==[
-    setPlayerHeight(newHeight)
-    - newHeight : number (0.4 to 3.0, default range)
-    - Returns true on success, false + notification on failure
-]==]
-
-local function setPlayerHeight(newHeight)
-    -- Clamp to reasonable values
-    newHeight = math.clamp(newHeight, 0.4, 3.0)
-    
-    local lp = game.Players.LocalPlayer
-    local char = lp.Character
-    if not char or not char.Parent then
-        return false
-    end
-    
-    local hum = char:FindFirstChildOfClass("Humanoid")
-    if not hum then
-        return false
-    end
-    
-    -- Get current HumanoidDescription
-    local desc = hum:GetAppliedDescription()
-    if not desc then
-        return false
-    end
-    
-    -- Build payload (same format as the game expects)
-    local properties = {
-        Head = desc.Head or 0,
-        Torso = desc.Torso or 0,
-        LeftArm = desc.LeftArm or 0,
-        RightArm = desc.RightArm or 0,
-        LeftLeg = desc.LeftLeg or 0,
-        RightLeg = desc.RightLeg or 0,
-        Face = desc.Face or 0,
-        Shirt = desc.Shirt or 0,
-        Pants = desc.Pants or 0,
-        GraphicTShirt = desc.GraphicTShirt or 0,
-        RunAnimation = desc.RunAnimation or 0,
-        WalkAnimation = desc.WalkAnimation or 0,
-        JumpAnimation = desc.JumpAnimation or 0,
-        FallAnimation = desc.FallAnimation or 0,
-        ClimbAnimation = desc.ClimbAnimation or 0,
-        IdleAnimation = desc.IdleAnimation or 0,
-        SwimAnimation = desc.SwimAnimation or 0,
-        HeightScale = newHeight,
-        WidthScale = desc.WidthScale or 1,
-        DepthScale = desc.DepthScale or 1,
-        HeadScale = desc.HeadScale or 1,
-        BodyTypeScale = desc.BodyTypeScale or 0,
-        ProportionScale = desc.ProportionScale or 0,
-    }
-    
-    local accessories = {}
-    for _, acc in ipairs(desc:GetAccessories(true)) do
-        table.insert(accessories, {
-            IsLayered = acc.IsLayered,
-            AccessoryType = acc.AccessoryType.Name,
-            AssetId = acc.AssetId,
-            Order = acc.Order,
-            Puffiness = acc.Puffiness
-        })
-    end
-    
-    local payload = {
-        accessories = accessories,
-        properties = properties
-    }
-    
-    -- Try to send via the game's remote (assumes "Net" module is loaded)
-    local success = false
-    if getgenv().Send then
-        success = getgenv().Send("wear_outfit_from_desc", payload)
-    end
-    
-    -- Fallback: apply description locally (visible only to you)
-    if not success then
-        pcall(function()
-            local newDesc = Instance.new("HumanoidDescription")
-            for k, v in pairs(properties) do
-                if newDesc[k] ~= nil then
-                    newDesc[k] = v
-                end
-            end
-            hum:ApplyDescription(newDesc)
-        end)
-        return true
-    end
-    
-    return success
-end
-
--- Create the slider
-local HeightSlider = Tabs.Player:AddSlider("HeightSlider", {
-    Title = "Player Height",
-    Description = "Change your height above and beyond...",
-    Min = 0.4,
-    Max = 3.0,
-    Default = getCurrentHeight(),   -- 🔥 sets to your ACTUAL current height
-    Rounding = 2,
-    Callback = function(value)
-        setPlayerHeight(value)
-        -- Optional: small visual feedback (no notification spam)
-    end
-})
-
 
 local NoclipToggle = Tabs.Player:AddToggle("NoclipToggle", {
     Title = "Noclip",
@@ -1451,7 +1435,7 @@ RainbowPhoneToggle:OnChanged(function(value)
 end)
 
 -- ----- Copy Avatar Tab -----
-Tabs.Misc:AddSection("Instant Copy")
+Tabs.Misc:AddSection("Avatar Copier")
 Tabs.Misc:AddParagraph({
     Title = "Instructions",
     Content = "Use the dropdown below or click the button to select a player."
@@ -1567,6 +1551,8 @@ Tabs.Misc:AddButton({
     Description = "Click a player in the game world to instantly copy their look",
     Callback = startTargetSelection
 })
+
+
 
 -- ----- Settings Tab -----
 SaveManager:SetLibrary(Fluent)
@@ -1731,6 +1717,7 @@ UIS.InputChanged:Connect(function(input)
 		)
 	end
 end)
+
 
 
 -- ================================

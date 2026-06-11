@@ -509,14 +509,28 @@ local function safeSetHeight(value)
     local hum = char:FindFirstChildOfClass("Humanoid")
     if not hum then return end
 
-    -- isolate EVERYTHING risky
     local ok = pcall(function()
         local desc = hum:GetAppliedDescription()
         if not desc then return end
 
-        desc.HeightScale = value
+        -- 🔥 CREATE A FULL SNAPSHOT COPY (IMPORTANT FIX)
+        local newDesc = Instance.new("HumanoidDescription")
+
+        for _, prop in ipairs({
+            "Head","Torso","LeftArm","RightArm","LeftLeg","RightLeg",
+            "Face","Shirt","Pants","GraphicTShirt",
+            "RunAnimation","WalkAnimation","JumpAnimation","FallAnimation",
+            "ClimbAnimation","IdleAnimation","SwimAnimation",
+            "WidthScale","DepthScale","HeadScale",
+            "BodyTypeScale","ProportionScale"
+        }) do
+            newDesc[prop] = desc[prop]
+        end
+
+        newDesc.HeightScale = value
 
         local accessories = {}
+
         pcall(function()
             for _, acc in ipairs(desc:GetAccessories(true)) do
                 accessories[#accessories+1] = {
@@ -530,34 +544,35 @@ local function safeSetHeight(value)
         end)
 
         local sent = false
+
         if getgenv().Send then
             pcall(function()
                 sent = getgenv().Send("wear_outfit_from_desc", {
                     accessories = accessories,
                     properties = {
-                        Head = desc.Head,
-                        Torso = desc.Torso,
-                        LeftArm = desc.LeftArm,
-                        RightArm = desc.RightArm,
-                        LeftLeg = desc.LeftLeg,
-                        RightLeg = desc.RightLeg,
-                        Face = desc.Face,
-                        Shirt = desc.Shirt,
-                        Pants = desc.Pants,
-                        GraphicTShirt = desc.GraphicTShirt,
-                        RunAnimation = desc.RunAnimation,
-                        WalkAnimation = desc.WalkAnimation,
-                        JumpAnimation = desc.JumpAnimation,
-                        FallAnimation = desc.FallAnimation,
-                        ClimbAnimation = desc.ClimbAnimation,
-                        IdleAnimation = desc.IdleAnimation,
-                        SwimAnimation = desc.SwimAnimation,
-                        HeightScale = value,
-                        WidthScale = desc.WidthScale,
-                        DepthScale = desc.DepthScale,
-                        HeadScale = desc.HeadScale,
-                        BodyTypeScale = desc.BodyTypeScale,
-                        ProportionScale = desc.ProportionScale
+                        Head = newDesc.Head,
+                        Torso = newDesc.Torso,
+                        LeftArm = newDesc.LeftArm,
+                        RightArm = newDesc.RightArm,
+                        LeftLeg = newDesc.LeftLeg,
+                        RightLeg = newDesc.RightLeg,
+                        Face = newDesc.Face,
+                        Shirt = newDesc.Shirt,
+                        Pants = newDesc.Pants,
+                        GraphicTShirt = newDesc.GraphicTShirt,
+                        RunAnimation = newDesc.RunAnimation,
+                        WalkAnimation = newDesc.WalkAnimation,
+                        JumpAnimation = newDesc.JumpAnimation,
+                        FallAnimation = newDesc.FallAnimation,
+                        ClimbAnimation = newDesc.ClimbAnimation,
+                        IdleAnimation = newDesc.IdleAnimation,
+                        SwimAnimation = newDesc.SwimAnimation,
+                        HeightScale = newDesc.HeightScale,
+                        WidthScale = newDesc.WidthScale,
+                        DepthScale = newDesc.DepthScale,
+                        HeadScale = newDesc.HeadScale,
+                        BodyTypeScale = newDesc.BodyTypeScale,
+                        ProportionScale = newDesc.ProportionScale
                     }
                 })
             end)
@@ -565,14 +580,13 @@ local function safeSetHeight(value)
 
         if not sent then
             pcall(function()
-                hum:ApplyDescription(desc)
+                hum:ApplyDescription(newDesc)
             end)
         end
     end)
 
-    -- debug so you KNOW if callback is silently failing
     if not ok then
-        warn("Height callback failed safely (no crash)")
+        warn("Height callback failed safely")
     end
 end
 
